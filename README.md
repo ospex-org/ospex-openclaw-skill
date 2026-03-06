@@ -16,16 +16,16 @@ A work in progress. Extends ospex-one with additional market types and configura
 
 ## FAQ
 
-**Can I change the default settings?**
+**Can I change the default settings?**<br>
 Yes — edit the values in the table in the Defaults section of the SKILL file.
 
-**What's the bet limit? Is that permanent?**
+**What's the bet limit? Is that permanent?**<br>
 3 USDC. Not permanent, but no timeline for increasing it.
 
-**If I say more than one word, like "Lakers plus points", will it know what I mean?**
+**If I say more than one word, like "Lakers plus points", will it know what I mean?**<br>
 Maybe.
 
-**What is ospex-plus?**
+**What is ospex-plus?**<br>
 A more full-fledged version of ospex-one that accepts natural speech bets — things like "Take the under in the Lakers game" or "If Luka is starting, lay the points with the Lakers." Still in development.
 
 ## Links

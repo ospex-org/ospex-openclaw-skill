@@ -39,7 +39,7 @@ Throughout Steps 1–3, send the user brief status messages at each stage so the
 - After Step 3b creates the position: `"Position created, waiting for match..."`
 - Step 4 delivers the final result (see below)
 
-If any step fails, the failure message itself serves as the status update — no need to send a separate one.
+If any step fails, the failure message itself serves as the status update — no need to send a separate one. If any API call returns an unexpected error, stop and report it. Do not silently retry or work around failures.
 
 ## Step 1: Resolve Team
 

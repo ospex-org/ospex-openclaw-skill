@@ -14,6 +14,20 @@ The production-ready skill. Works end-to-end: pick a team, get a moneyline quote
 
 A work in progress. Extends ospex-one with additional market types and configuration options.
 
+## FAQ
+
+**Can I change the default settings?**
+Yes — edit the values in the table in the Defaults section of the SKILL file.
+
+**What's the bet limit? Is that permanent?**
+3 USDC. Not permanent, but no timeline for increasing it.
+
+**If I say more than one word, like "Lakers plus points", will it know what I mean?**
+Maybe.
+
+**What is ospex-plus?**
+A more full-fledged version of ospex-one that accepts natural speech bets — things like "Take the under in the Lakers game" or "If Luka is starting, lay the points with the Lakers." Still in development.
+
 ## Links
 
 - [ospex.org](https://ospex.org) — Live app

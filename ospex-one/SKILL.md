@@ -34,7 +34,7 @@ One word in, one transaction hash out. This skill emphasizes execution over disc
 
 Throughout Steps 1–3, send the user brief status messages at each stage so they aren't waiting in silence. These should be short, single-line updates — not explanations.
 
-- After Step 1 resolves the team: `"Found: {awayTeam} vs {homeTeam}, {matchTime formatted as 'Mon D, YYYY, H:MM PM' in local time, e.g. 'Mar 3, 2026, 8:00 PM CST'}"`
+- After Step 1 resolves the team: `"Found: {awayTeam} vs {homeTeam}, {matchTime formatted as 'Mon D, YYYY, H:MM PM' in EST, e.g. 'Mar 3, 2026, 8:00 PM EST'}"`
 - After Step 2 gets a quote: `"Quote: {approvedOddsAmerican} ({approvedOddsDecimal}), {amount} USDC"`
 - After Step 3b creates the position: `"Position created, waiting for match..."`
 - Step 4 delivers the final result (see below)

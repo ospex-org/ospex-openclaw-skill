@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word. Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.1.0
+version: 1.2.0
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -183,33 +183,23 @@ These operations should only be triggered when the user explicitly requests them
 
 When the user asks "status", "how am I doing", or similar:
 
-1. Call `GET /v1/positions/{OSPEX_WALLET_ADDRESS}/status`
+1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/status`
 2. Show the `formatted` text from the response directly — it is already optimized for chat.
 3. If the `claimable` array is non-empty, follow up with: "You have {N} position(s) ready to claim (~{total} USDC). Want me to claim them?"
-4. If the user confirms, execute "Claim a Resolved Position" for each claimable position using the `speculationId`, `oddsPairId`, and `positionType` from the response data.
+4. If the user confirms, follow the "Claim" flow below.
 
 ### Withdraw an Unmatched Position
 
-If the position was not matched (or was only partially matched), the user can withdraw their unmatched funds. This uses `adjustUnmatchedPair` with a negative amount.
+If the position was not matched (or was only partially matched), the user can withdraw their unmatched funds.
 
-**Precondition:** The speculation must still be open (not yet settled). If the speculation has already settled, unmatched funds are returned through `claimPosition` instead.
+**Precondition:** The speculation must still be open (not yet settled). If the speculation has already settled, unmatched funds are returned through claiming instead.
 
-Write and execute a Node.js script (ethers.js v6):
+1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/withdraw-params`
+2. The response contains a `positions` array. Each entry includes a `description` (e.g., "Lakers ML — Unmatched, 3.00 USDC") and a `txParams` object.
+3. Write and execute a Node.js script (ethers.js v6) that calls `positionModule.adjustUnmatchedPair()` using the values from `txParams.args` directly. Do not compute any arguments yourself. Wait for the transaction to be mined.
+4. Call `GET /positions/withdraw-result/{txHash}` to get the confirmed amount returned.
 
-```javascript
-const withdrawAmount = -amount; // negate the full unmatched amount (6 decimals)
-const tx = await positionModule.adjustUnmatchedPair(
-  speculationId,           // from the original position
-  oddsPairId,              // from the positions/by-tx response or status endpoint
-  0,                       // newUnmatchedExpiry: 0 clears the expiry
-  positionType,            // 0 or 1, same as when created
-  withdrawAmount,          // negative value = withdraw
-  0                        // contributionAmount
-);
-const receipt = await tx.wait();
-```
-
-Report: `Withdrawn. {amount} USDC returned. Tx: {txHash}`
+Report: `Withdrawn. {amountReturned} USDC returned. Tx: {txHash}`
 
 ### Claim a Resolved Position
 
@@ -217,28 +207,12 @@ After the game ends and the speculation is settled (scored), the user can claim 
 
 **Precondition:** The speculation must be settled. Positions can only be claimed once.
 
-```javascript
-const tx = await positionModule.claimPosition(
-  speculationId,           // from the original position
-  oddsPairId,              // from the positions/by-tx response or status endpoint
-  positionType             // 0 or 1, same as when created
-);
-const receipt = await tx.wait();
+1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/claim-params`
+2. The response contains a `positions` array. Each entry includes a `description` (e.g., "Celtics ML — Won") and a `txParams` object.
+3. Write and execute a single Node.js script (ethers.js v6) that calls `positionModule.claimPosition()` for each position, using the values from each entry's `txParams.args` directly. Do not compute any arguments yourself. Wait for each transaction to be mined.
+4. Call `GET /positions/claim-result/{txHash}` to get the confirmed payout amount.
 
-const claimIface = new ethers.Interface([
-  "event PositionClaimed(uint256 indexed speculationId, address indexed user, uint128 oddsPairId, uint8 positionType, uint256 payout)"
-]);
-
-let claimParsed = null;
-for (const log of receipt.logs) {
-  try { claimParsed = claimIface.parseLog(log); if (claimParsed) break; } catch {}
-}
-const claimAmount = claimParsed
-  ? (Number(claimParsed.args.payout) / 1_000_000).toFixed(2)
-  : "unknown";
-```
-
-Report: `Claimed {claimAmount} USDC. Tx: {txHash}`
+Report: `Claimed {payout} USDC. Tx: {txHash}`
 
 ### When to Use Which
 
@@ -256,6 +230,10 @@ Base URL: `https://api.ospex.org/v1` — no auth, rate limit 100 req/60s/IP.
 | `GET /markets?sport={nba\|nhl\|ncaab}` | Find games, contestIds, speculationIds |
 | `GET /positions/{address}/status` | Active, claimable, and withdrawable positions |
 | `GET /positions/by-tx/{txHash}` | Get positionId from a transaction hash (server-side event parsing) |
+| `GET /positions/{address}/claim-params` | Pre-computed txParams for all claimable positions |
+| `GET /positions/{address}/withdraw-params` | Pre-computed txParams for all withdrawable positions |
+| `GET /positions/claim-result/{txHash}` | Parse claim receipt, return payout amount |
+| `GET /positions/withdraw-result/{txHash}` | Parse withdraw receipt, return amount returned |
 | `GET /analytics/odds-history/{contestId}` | Current market odds + opening lines + line movement |
 | `POST /instant-match/{quoteId}/accept-counter` | Accept Michelle's counter-offer (required before match) |
 | `POST /instant-match/{speculationId}/quote?stream=false` | Request a quote from Michelle (existing speculation) |

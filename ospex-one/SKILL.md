@@ -1,7 +1,7 @@
 ---
 name: ospex-one
-description: "Bet on sports with one word. Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.2.0
+description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
+version: 1.3.0
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -9,7 +9,7 @@ metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"require
 
 # ospex-one
 
-One word in, one transaction hash out. This skill emphasizes execution over discussion and is low-stakes by design.
+One word in, one transaction hash out. This skill emphasizes execution over discussion and is low-risk by design.
 
 **Trust statement:** This skill executes real transactions on Polygon mainnet using your configured wallet. Positions are capped at 3 USDC. Unmatched position amounts can be withdrawn at any time. Only install if you understand the risks. Full risk assessment: https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
 
@@ -19,7 +19,7 @@ One word in, one transaction hash out. This skill emphasizes execution over disc
 
 | Parameter | Default |
 |-----------|---------|
-| Market | moneyline |
+| Market | moneyline (override with spread/total via input like "Lakers -6.5" or "over 220.5") |
 | Amount | 3 USDC (maximum per transaction) |
 | Side | the named team |
 | Odds multiplier | 1.05 |
@@ -29,37 +29,50 @@ One word in, one transaction hash out. This skill emphasizes execution over disc
 
 Throughout Steps 1–3, send the user brief status messages at each stage so they aren't waiting in silence. These should be short, single-line updates — not explanations.
 
-- After Step 1 resolves the team: `"Found: {awayTeam} vs {homeTeam}, {matchTime formatted as 'Mon D, YYYY, H:MM PM' in EST, e.g. 'Mar 3, 2026, 8:00 PM EST'}"`
+- After Step 1 resolves the team: `"Found: {awayTeam} vs {homeTeam}, {matchTime formatted as 'Mon D, YYYY, H:MM PM' in EST, e.g. 'Mar 3, 2026, 8:00 PM EST'}, {marketType}{line if applicable}"`
 - After Step 2 gets a quote: `"Quote: {approvedOddsAmerican} ({approvedOddsDecimal}), {amount} USDC"`
 - After Step 3 creates the position: `"Position created, waiting for match..."`
 - Step 4 delivers the final result
 
 If any step fails, the failure message itself serves as the status update — no need to send a separate one. If any API call returns an unexpected error, stop and report it. Do not silently retry or work around failures.
 
-## Step 1: Resolve Team
+## Step 1: Resolve Team and Market Type
 
 When you receive input, your **first action** is always to call the API — do not ask the user anything first.
 
-1. Call `GET /markets?sport=nba`, `GET /markets?sport=nhl`, and `GET /markets?sport=ncaab`
-2. Search all responses for the input text in `homeTeam` and `awayTeam` fields.
-3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, whether the team is home or away, and check the `speculations` array for an existing `speculationId` for moneyline.
+**Detect market type from input:**
+- If the input includes a point value (e.g., "Atlanta -6.5", "Boise +1.5", "Celtics -3") → market type is **spread**, line is the number with its sign
+- If the input includes "over" or "under" with a number (e.g., "Lakers over 220.5") → market type is **total**, line is the number
+- Otherwise → market type is **moneyline** (default)
+
+**For spread and total markets:** This skill uses the current market line from odds-history. If the user specifies a line that differs from the current market (e.g., user says "+1.5" but market is at -3.5), inform the user of the current line and ask if they want to proceed at that line instead. Do not attempt to create a position at a non-market line.
+
+1. Call `GET /markets`.
+2. Search all responses for the input text in `homeTeam` and `awayTeam` fields. Note: All API responses use a `{ data: ..., formatted: "..." }` envelope. When searching for teams, look inside the `data` array, not the top-level response.
+3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, whether the team is home or away, the detected market type, and check the `speculations` array for an existing `speculationId` matching that market type.
 4. If not found → respond: "No active market found for {input}"
 
 Only ask the user for clarification if the team is genuinely ambiguous across multiple games.
 
 ## Step 2: Get a Quote from the agent market maker (Michelle)
 
-First, determine the odds to request. Call `GET /analytics/odds-history/{contestId}` to get current market moneyline odds. Use the `current.moneyline.awayOdds` or `current.moneyline.homeOdds` value (decimal format) depending on which team the user picked. Apply the odds multiplier from the Defaults section and floor to 2 decimal places: `Math.floor(marketOdds * oddsMultiplier * 100) / 100`. This is your minimum acceptable odds.
+First, determine the odds to request. Call `GET /analytics/odds-history/{contestId}` to get current market odds. Select the odds for the detected market type:
+
+- **Moneyline:** Use `current.moneyline.awayOdds` or `current.moneyline.homeOdds` depending on which team the user picked.
+- **Spread:** Use `current.spread.awayOdds` or `current.spread.homeOdds`.
+- **Total:** Use `current.total.overOdds` or `current.total.underOdds`.
+
+Apply the odds multiplier from the Defaults section and floor to 2 decimal places: `Math.floor(marketOdds * oddsMultiplier * 100) / 100`. This is your minimum acceptable odds.
 
 Note: Higher decimal odds = higher payout for the bettor. A quote at 2.00 is better than 1.85.
 
-If the odds-history endpoint returns no data, ask the user what odds they'd like — don't guess, since moneyline odds vary widely depending on the matchup.
+If the odds-history endpoint returns no data for the relevant market type, use 1.91 as a reasonable default for spread/total (standard -110 line). For moneyline, ask the user — don't guess, since moneyline odds vary widely depending on the matchup.
 
 **If `speculationId` exists** (from the speculations array):
 ```
 POST /instant-match/{speculationId}/quote?stream=false
 {
-  "side": "home" or "away",
+  "side": "home", "away", "over", or "under" (see side mapping below),
   "amountUSDC": {amount parameter, from Defaults section},
   "odds": {calculated odds},
   "oddsFormat": "decimal",
@@ -72,29 +85,30 @@ POST /instant-match/{speculationId}/quote?stream=false
 POST /instant-match/quote?stream=false
 {
   "contestId": {contestId},
-  "marketType": "moneyline",
-  "side": "home" or "away",
+  "marketType": "{detected market type: moneyline, spread, or total}",
+  "side": "home", "away", "over", or "under" (see side mapping below),
   "amountUSDC": {amount parameter, from Defaults section},
   "odds": {calculated odds},
   "oddsFormat": "decimal",
-  "wallet": "{OSPEX_WALLET_ADDRESS}"
+  "wallet": "{OSPEX_WALLET_ADDRESS}",
+  "line": {line value, required for spread/total, omit for moneyline}
 }
 ```
 
-Both return: `quoteId`, `approved`, `approvedOddsDecimal`, `approvedOddsAmerican`, `expiresAt`. If Michelle counters, the response also includes a `counterOffer` object.
+Both return: `quoteId`, `approved`, `approvedOddsDecimal`, `approvedOddsAmerican`, `expiresAt`. If Michelle counters, the response also includes a `counterOffer` object. The quote expires at `expiresAt`. Steps 3-4 must complete before this time.
 
 **Save the `txParams` object from the response — you will need it in Step 3.** This contains all pre-computed on-chain transaction parameters. Do not compute these values yourself.
 
 - If `approved` is false → tell the user "Michelle (market maker agent) declined — {reason}" and stop.
 - If `approvedOddsDecimal` is **greater than or equal to** your requested odds → Michelle is offering the same or better. Keep moving, no confirmation needed.
-- If `approvedOddsDecimal` is **less than** your requested odds → Michelle is offering worse odds. **Stop and confirm with the user** before proceeding. Show them the counter-offer, let the user know that they have one minute to respond, and ask if they want to accept. If the user accepts, call:
+- If `approvedOddsDecimal` is **less than** your requested odds → Michelle is offering worse odds. **Stop and confirm with the user** before proceeding. Show them the counter-offer, let the user know that they must respond before the counter expires, and ask if they want to accept. If the user accepts, call:
 ```
 POST /instant-match/{quoteId}/accept-counter
 Body: { "wallet": "{OSPEX_WALLET_ADDRESS}" }
 ```
 This returns an updated `txParams` object. **Use the txParams from this response** (it reflects the accepted counter-offer terms).
 
-**For `side`:** If the user's team is the `homeTeam` → `"home"`. If `awayTeam` → `"away"`.
+**For `side`:** For moneyline and spread: if the user's team is the `homeTeam` → `"home"`. If `awayTeam` → `"away"`. For total: if the user said "over" → `"over"`. If "under" → `"under"`.
 
 ## Step 3: Create Position and Match
 
@@ -166,12 +180,12 @@ for (let attempt = 1; attempt <= 5; attempt++) {
 }
 ```
 
-The protocol indexer can take 10-25 seconds, especially on cold starts. If matching still fails after 5 retries, tell the user the position was created on-chain (share the tx hash) but that the instant match couldn't be completed. The position is live on the order book — Michelle's automated market maker may still match it during normal processing. If it remains unmatched, the user can withdraw their funds at any time.
+The protocol indexer can take 5-25 seconds, especially on cold starts. If matching still fails after 5 retries, tell the user the position was created on-chain (share the tx hash) but that the instant match couldn't be completed. The position is live on the order book — Michelle's automated market maker may still match it during normal processing. If it remains unmatched, the user can withdraw their funds at any time.
 
 ## Step 4: Report Result
 
 ```
-Done. {Team} ML at {americanOdds} ({decimalOdds}), {amount} USDC.
+Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {amount} USDC.
 https://ospex.org/p/{positionId}
 ```
 
@@ -197,6 +211,19 @@ If the position was not matched (or was only partially matched), the user can wi
 1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/withdraw-params`
 2. The response contains a `positions` array. Each entry includes a `description` (e.g., "Lakers ML — Unmatched, 3.00 USDC") and a `txParams` object.
 3. Write and execute a Node.js script (ethers.js v6) that calls `positionModule.adjustUnmatchedPair()` using the values from `txParams.args` directly. Do not compute any arguments yourself. Wait for the transaction to be mined.
+
+```javascript
+const tx = await positionModule.adjustUnmatchedPair(
+  txParams.args.speculationId,
+  txParams.args.oddsPairId,
+  txParams.args.newUnmatchedExpiry,
+  txParams.args.positionType,
+  txParams.args.amount,
+  txParams.args.contributionAmount
+);
+const receipt = await tx.wait();
+```
+
 4. Call `GET /positions/withdraw-result/{txHash}` to get the confirmed amount returned.
 
 Report: `Withdrawn. {amountReturned} USDC returned. Tx: {txHash}`
@@ -210,6 +237,18 @@ After the game ends and the speculation is settled (scored), the user can claim 
 1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/claim-params`
 2. The response contains a `positions` array. Each entry includes a `description` (e.g., "Celtics ML — Won") and a `txParams` object.
 3. Write and execute a single Node.js script (ethers.js v6) that calls `positionModule.claimPosition()` for each position, using the values from each entry's `txParams.args` directly. Do not compute any arguments yourself. Wait for each transaction to be mined.
+
+```javascript
+for (const entry of positions) {
+  const tx = await positionModule.claimPosition(
+    entry.txParams.args.speculationId,
+    entry.txParams.args.oddsPairId,
+    entry.txParams.args.positionType
+  );
+  const receipt = await tx.wait();
+}
+```
+
 4. Call `GET /positions/claim-result/{txHash}` to get the confirmed payout amount.
 
 Report: `Claimed {payout} USDC. Tx: {txHash}`

@@ -68,6 +68,8 @@ Note: Higher decimal odds = higher payout for the bettor. A quote at 2.00 is bet
 
 If the odds-history endpoint returns no data for the relevant market type, use 1.91 as a reasonable default for spread/total (standard -110 line). For moneyline, ask the user — don't guess, since moneyline odds vary widely depending on the matchup.
 
+**Line validation:** The quote API requires lines in .5 increments (e.g., -10.5, +3.5, 195.5). If the line from odds-history is a whole number or does not end in .5, stop and tell the user: "Spread/total line unavailable for this market right now." Do not attempt to convert it.
+
 **If `speculationId` exists** (from the speculations array):
 ```
 POST /instant-match/{speculationId}/quote?stream=false

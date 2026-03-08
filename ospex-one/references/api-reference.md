@@ -64,6 +64,70 @@ Platform fees are **currently disabled**. The `feeTxHash` field on instant-match
 
 ---
 
+## Auth
+
+EIP-712 typed-data authentication. Not required for any read or instant-match endpoints — included here for completeness.
+
+### GET /auth/domain
+
+Returns the EIP-712 domain separator, action types, and a sample request format. Use this to construct a signable typed-data payload.
+
+```bash
+curl "https://api.ospex.org/v1/auth/domain"
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "domain": {
+      "name": "Ospex",
+      "version": "1",
+      "chainId": 137,
+      "verifyingContract": "0x8016b2c5f161e84940e25bb99479aaca19d982ad"
+    },
+    "actions": { "verify": [{ "name": "wallet", "type": "address" }, { "name": "nonce", "type": "uint256" }] },
+    "requestFormat": {
+      "description": "Sign the action object with EIP-712 and POST to /auth/verify",
+      "example": { "action": { "type": "verify", "wallet": "0xYourWalletAddress", "nonce": 1708900000000 }, "signature": "0x..." }
+    }
+  }
+}
+```
+
+---
+
+### POST /auth/verify
+
+Verify an EIP-712 signature. Returns the recovered wallet address.
+
+**Request body:**
+
+```json
+{
+  "action": { "type": "verify", "wallet": "0xYourWalletAddress", "nonce": 1708900000000 },
+  "signature": "0x..."
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "data": {
+    "authenticated": true,
+    "wallet": "0xabcd...",
+    "network": "polygon",
+    "chainId": 137
+  }
+}
+```
+
+**Errors:** 400 if signature is invalid or wallet does not match recovered signer
+
+---
+
 ## Markets
 
 ### GET /markets
@@ -331,6 +395,204 @@ curl "https://api.ospex.org/v1/positions/0xabcd1234abcd1234abcd1234abcd1234abcd1
 **Formatted text:** The `formatted` field returns a Telegram-optimized summary. Shows one-liner per position when counts are small, switches to aggregate counts when there are many.
 
 **Errors:** 400 if address is invalid; returns empty arrays (not 404) if no unclaimed positions
+
+---
+
+### GET /positions/by-tx/:txHash
+
+Parse `PositionCreated` events from a transaction receipt. Use this after creating a position on-chain to get the `positionId` deterministically (instead of parsing logs client-side).
+
+```bash
+curl "https://api.ospex.org/v1/positions/by-tx/0xabc123..."
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "txHash": "0xabc123...",
+    "blockNumber": 12345678,
+    "transactionIndex": 5,
+    "positions": [
+      {
+        "positionId": "101_0xabcd..._42_0",
+        "speculationId": "101",
+        "oddsPairId": "42",
+        "positionType": 0,
+        "user": "0xabcd...",
+        "amount": "3000000",
+        "upperOdds": 18500000,
+        "lowerOdds": 21700000,
+        "unmatchedExpiry": 1709596800
+      }
+    ]
+  }
+}
+```
+
+**Fields:**
+- `positionId`: composite key (`{speculationId}_{user}_{oddsPairId}_{positionType}`)
+- `amount`: USDC in wei (divide by 1e6 for human-readable)
+- `upperOdds`/`lowerOdds`: scaled by 1e7 (divide by 1e7 for decimal odds)
+
+**Errors:**
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `INVALID_TX_HASH` | 400 | Not a valid transaction hash |
+| `TX_NOT_FOUND` | 404 | Transaction not found on-chain |
+| `TX_REVERTED` | 400 | Transaction reverted |
+| `NO_POSITION_EVENT` | 404 | No PositionCreated event in receipt |
+
+---
+
+### GET /positions/:address/claim-params
+
+Pre-computed `txParams` for all claimable positions. Returns everything needed to call `claimPosition` on-chain without computing any arguments.
+
+```bash
+curl "https://api.ospex.org/v1/positions/0xabcd.../claim-params"
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "address": "0xabcd...",
+    "positions": [
+      {
+        "positionId": "104_0xabcd..._10119_1",
+        "speculationId": "104",
+        "description": "Celtics ML — Won",
+        "txParams": {
+          "method": "claimPosition",
+          "args": {
+            "speculationId": "104",
+            "oddsPairId": "10119",
+            "positionType": 1
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+**Errors:** 400 if address is invalid
+
+---
+
+### GET /positions/:address/withdraw-params
+
+Pre-computed `txParams` for all withdrawable unmatched positions. Returns everything needed to call `adjustUnmatchedPair` on-chain.
+
+```bash
+curl "https://api.ospex.org/v1/positions/0xabcd.../withdraw-params"
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "address": "0xabcd...",
+    "positions": [
+      {
+        "positionId": "112_0xabcd..._10284_1",
+        "speculationId": "112",
+        "description": "Lakers ML — Unmatched, 3.00 USDC",
+        "txParams": {
+          "method": "adjustUnmatchedPair",
+          "args": {
+            "speculationId": "112",
+            "oddsPairId": "10284",
+            "newUnmatchedExpiry": 0,
+            "positionType": 1,
+            "amount": "-3000000",
+            "contributionAmount": "0"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+**Fields:**
+- `amount`: negative value (withdrawal), in USDC wei
+- `newUnmatchedExpiry`: `0` (clears expiry on full withdrawal)
+
+**Errors:** 400 if address is invalid
+
+---
+
+### GET /positions/claim-result/:txHash
+
+Parse a `PositionClaimed` event from a claim transaction receipt. Use after calling `claimPosition` on-chain to get the confirmed payout amount.
+
+```bash
+curl "https://api.ospex.org/v1/positions/claim-result/0xdef456..."
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "speculationId": "104",
+    "payout": "5.99",
+    "txHash": "0xdef456..."
+  }
+}
+```
+
+**Fields:**
+- `payout`: USDC in human-readable decimal format (already divided by 1e6)
+
+**Errors:**
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `INVALID_TX_HASH` | 400 | Not a valid transaction hash |
+| `TX_NOT_FOUND` | 404 | Transaction not found on-chain |
+| `TX_REVERTED` | 400 | Transaction reverted |
+| `NO_CLAIM_EVENT` | 404 | No PositionClaimed event in receipt |
+
+---
+
+### GET /positions/withdraw-result/:txHash
+
+Parse a `PositionAdjusted` event from a withdraw transaction receipt. Use after calling `adjustUnmatchedPair` on-chain to get the confirmed amount returned.
+
+```bash
+curl "https://api.ospex.org/v1/positions/withdraw-result/0xghi789..."
+```
+
+**Response:**
+
+```json
+{
+  "data": {
+    "speculationId": "112",
+    "amountReturned": "3.00",
+    "txHash": "0xghi789..."
+  }
+}
+```
+
+**Fields:**
+- `amountReturned`: USDC in human-readable decimal format (already divided by 1e6)
+
+**Errors:**
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `INVALID_TX_HASH` | 400 | Not a valid transaction hash |
+| `TX_NOT_FOUND` | 404 | Transaction not found on-chain |
+| `TX_REVERTED` | 400 | Transaction reverted |
+| `NO_WITHDRAW_EVENT` | 404 | No PositionAdjusted event in receipt |
 
 ---
 
@@ -867,7 +1129,18 @@ Stream events: `progress` (intermediate updates), `result` (final outcome), `err
   "quoteId": "quote_abc123",
   "approvedOddsDecimal": 1.85,
   "approvedOddsAmerican": -118,
-  "expiresAt": "2026-02-22T00:01:00.000Z"
+  "expiresAt": "2026-02-22T00:01:00.000Z",
+  "txParams": {
+    "method": "createUnmatchedPair",
+    "args": {
+      "speculationId": "101",
+      "odds": "18500000",
+      "unmatchedExpiry": "1709596800",
+      "positionType": 0,
+      "amount": "3000000",
+      "contributionAmount": "0"
+    }
+  }
 }
 ```
 
@@ -880,7 +1153,18 @@ Stream events: `progress` (intermediate updates), `result` (final outcome), `err
   "approvedOddsDecimal": 1.90,
   "approvedOddsAmerican": -111,
   "counterOffer": { "oddsDecimal": 1.90, "oddsAmerican": -111, "ttlSeconds": 60 },
-  "expiresAt": "2026-02-22T00:01:00.000Z"
+  "expiresAt": "2026-02-22T00:01:00.000Z",
+  "txParams": {
+    "method": "createUnmatchedPair",
+    "args": {
+      "speculationId": "101",
+      "odds": "19000000",
+      "unmatchedExpiry": "1709596800",
+      "positionType": 0,
+      "amount": "3000000",
+      "contributionAmount": "0"
+    }
+  }
 }
 ```
 
@@ -889,6 +1173,8 @@ Stream events: `progress` (intermediate updates), `result` (final outcome), `err
 ```json
 { "approved": false, "reason": "Odds too far from market" }
 ```
+
+**`txParams` object:** Included in approved quotes. Contains pre-computed on-chain transaction parameters — use these directly instead of computing odds conversion, position type, expiry, etc. yourself. The `method` field is either `"createUnmatchedPair"` (speculation path) or `"createUnmatchedPairWithSpeculation"` (contest path). All numeric values are strings (wei-scaled for USDC, 1e7-scaled for odds, unix seconds for expiry).
 
 #### Sync response (`?stream=false`)
 
@@ -922,7 +1208,7 @@ curl -X POST "https://api.ospex.org/v1/instant-match/101/quote?stream=false" \
 
 ### POST /instant-match/quote
 
-Request a quote without an existing speculation (contest-path variant). Same response format as above (SSE default, `?stream=false` for sync). The market type and contest are specified in the request body.
+Request a quote without an existing speculation (contest-path variant). Same response format as above (SSE default, `?stream=false` for sync). The market type and contest are specified in the request body. The `txParams` in the response uses `method: "createUnmatchedPairWithSpeculation"` (includes `contestId`, `scorer`, `theNumber`, `leaderboardId` args).
 
 **Request body:**
 
@@ -955,7 +1241,7 @@ Request a quote without an existing speculation (contest-path variant). Same res
 
 ### POST /instant-match/:quoteId/accept-counter
 
-Accept a counter-offer from the market maker. Required before calling the match endpoint when the quote response included a `counterOffer` object.
+Accept a counter-offer from the market maker. Required before calling the match endpoint when the quote response included a `counterOffer` object. Returns updated `txParams` reflecting the accepted counter-offer terms — use these instead of the original quote's `txParams`.
 
 **Request body:**
 
@@ -971,7 +1257,18 @@ Accept a counter-offer from the market maker. Required before calling the match 
   "quoteId": "quote_abc123",
   "approvedOddsDecimal": 1.92,
   "approvedOddsAmerican": -110,
-  "expiresAt": "2026-03-04T15:35:00.000Z"
+  "expiresAt": "2026-03-04T15:35:00.000Z",
+  "txParams": {
+    "method": "createUnmatchedPair",
+    "args": {
+      "speculationId": "101",
+      "odds": "19200000",
+      "unmatchedExpiry": "1709596800",
+      "positionType": 0,
+      "amount": "3000000",
+      "contributionAmount": "0"
+    }
+  }
 }
 ```
 
@@ -983,6 +1280,7 @@ Accept a counter-offer from the market maker. Required before calling the match 
 | `QUOTE_NOT_FOUND` | 404 | Quote does not exist |
 | `INVALID_QUOTE_STATE` | 400 | Quote is not in `counter` state |
 | `WALLET_MISMATCH` | 403 | Wallet does not match the original quote |
+| `COUNTER_STALE` | 400 | Counter-offer data is stale (re-request quote) |
 | `COUNTER_EXPIRED` | 410 | Counter-offer TTL has elapsed (default 60s) |
 
 ---

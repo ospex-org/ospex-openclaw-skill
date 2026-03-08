@@ -306,6 +306,11 @@ The `payout` field is the total USDC transferred to the user (matched winnings +
     "function adjustUnmatchedPair(uint256 speculationId, uint128 oddsPairId, uint32 newUnmatchedExpiry, uint8 positionType, int256 amount, uint256 contributionAmount)",
     "function claimPosition(uint256 speculationId, uint128 oddsPairId, uint8 positionType)",
     "function completeUnmatchedPair(uint256 speculationId, address maker, uint128 oddsPairId, uint8 makerPositionType, uint256 amount)",
+    "function completeUnmatchedPairBatch(uint256 speculationId, address[] makers, uint128[] oddsPairIds, uint8[] makerPositionTypes, uint256[] amounts)",
+    "function transferPosition(uint256 speculationId, address from, uint128 oddsPairId, uint8 positionType, address to, uint256 amount)",
+    "function getPosition(uint256 speculationId, address user, uint128 oddsPairId, uint8 positionType) view returns (tuple(uint256 matchedAmount, uint256 unmatchedAmount, bool claimed))",
+    "function getOddsPair(uint128 oddsPairId) view returns (tuple(uint64 upperOdds, uint64 lowerOdds))",
+    "function ODDS_PRECISION() view returns (uint64)",
     "event PositionCreated(uint256 indexed speculationId, address indexed user, uint128 oddsPairId, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint64 upperOdds, uint64 lowerOdds)",
     "event PositionAdjusted(uint256 indexed speculationId, address indexed user, uint128 oddsPairId, uint32 unmatchedExpiry, uint8 positionType, int256 amount)",
     "event PositionClaimed(uint256 indexed speculationId, address indexed user, uint128 oddsPairId, uint8 positionType, uint256 payout)"

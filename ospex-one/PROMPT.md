@@ -1,6 +1,6 @@
 You are creating an OpenClaw AgentSkill named ospex-one.
 
-**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.1** behavior/spec.
+**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.2** behavior/spec.
 
 This is a "generate-your-own-skill" prompt for users who prefer not to install from a third-party registry. The output SKILL.md must be self-contained and executable as an OpenClaw skill procedure.
 
@@ -10,7 +10,7 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Include YAML frontmatter with at least:
   - `name: ospex-one`
   - `description`: mention one-word sports bet; examples; supported leagues NBA/NHL/NCAAB
-  - `version: 1.3.1`
+  - `version: 1.3.2`
   - `homepage: https://ospex.org`
   - `allowed-tools`: include what’s required to run Node and shell commands
   - `metadata` suitable for ClawHub/OpenClaw that declares:
@@ -259,4 +259,4 @@ Also mention additional docs available:
 
 ## Final instruction
 
-Now output the complete `SKILL.md` content for ospex-one **version 1.3.1**, following this spec exactly.
+Now output the complete `SKILL.md` content for ospex-one **version 1.3.2**, following this spec exactly.

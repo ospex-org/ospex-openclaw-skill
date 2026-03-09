@@ -198,7 +198,7 @@ If matching fails after retries:
 Final output format must be:
 
 ```
-Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {amount} USDC.
+Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {matchedAmountUSDC} USDC matched, potential payout {potentialPayoutUSDC} USDC.
 https://ospex.org/p/{positionId}
 ```
 

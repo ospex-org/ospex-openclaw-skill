@@ -1298,8 +1298,16 @@ Execute a match against an approved quote. Call this after creating the position
 **Response (200):**
 
 ```json
-{ "matched": true, "txHash": "0x..." }
+{
+  "matched": true,
+  "txHash": "0x...",
+  "matchedAmountUSDC": 2.73,
+  "unmatchedAmountUSDC": 0.27,
+  "potentialPayoutUSDC": 5.73
+}
 ```
+
+The three enrichment fields are optional — they are included when the server can compute them from the match result. If absent, fall back to the quoted amount.
 
 **Errors:**
 

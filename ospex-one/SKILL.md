@@ -187,7 +187,7 @@ The protocol indexer can take 5-25 seconds, especially on cold starts. If matchi
 ## Step 4: Report Result
 
 ```
-Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {amount} USDC.
+Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {matchedAmountUSDC} USDC matched, potential payout {potentialPayoutUSDC} USDC.
 https://ospex.org/p/{positionId}
 ```
 

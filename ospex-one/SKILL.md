@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.3.3
+version: 1.3.4
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -152,6 +152,8 @@ Contributions: `txParams.args.contributionAmount` defaults to "0". Contributions
 
 Wait for the transaction to be mined: `const receipt = await tx.wait();`
 
+**Critical — no retries after a successful transaction:** Once `tx.wait()` confirms, the position exists on-chain and funds have moved. If any subsequent step fails (positionId lookup, match call, etc.), DO NOT re-run the script. Report the tx hash to the user and stop. To complete the interrupted flow, manually call `GET /positions/by-tx/{txHash}` and then `POST /instant-match/{quoteId}/match` as separate steps.
+
 **c) Get the positionId from the API:**
 
 Do **not** parse the transaction receipt yourself. Call the server-side endpoint which does this deterministically:
@@ -159,7 +161,7 @@ Do **not** parse the transaction receipt yourself. Call the server-side endpoint
 ```javascript
 const posRes = await fetch(`https://api.ospex.org/v1/positions/by-tx/${receipt.hash}`);
 const posData = await posRes.json();
-const positionId = posData.positions[0].positionId;
+const positionId = posData.data.positions[0].positionId;
 ```
 
 **d) Call the match endpoint:**

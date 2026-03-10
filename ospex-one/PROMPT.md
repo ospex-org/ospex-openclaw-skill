@@ -1,6 +1,6 @@
 You are creating an OpenClaw AgentSkill named ospex-one.
 
-**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.3** behavior/spec.
+**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.4** behavior/spec.
 
 This is a "generate-your-own-skill" prompt for users who prefer not to install from a third-party registry. The output SKILL.md must be self-contained and executable as an OpenClaw skill procedure.
 
@@ -10,7 +10,7 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Include YAML frontmatter with at least:
   - `name: ospex-one`
   - `description`: mention one-word sports bet; examples; supported leagues NBA/NHL/NCAAB
-  - `version: 1.3.3`
+  - `version: 1.3.4`
   - `homepage: https://ospex.org`
   - `allowed-tools`: include what’s required to run Node and shell commands
   - `metadata` suitable for ClawHub/OpenClaw that declares:
@@ -178,10 +178,13 @@ Contributions:
 After sending the transaction:
 - Wait for confirmation: `const receipt = await tx.wait()`.
 
+Transaction safety:
+- Once `tx.wait()` confirms, the position exists on-chain and funds have moved. If any subsequent step (positionId lookup, match call) fails, do NOT re-run the script. Report the tx hash and stop. To resume the interrupted flow, call `GET /positions/by-tx/{txHash}` and then `POST /instant-match/{quoteId}/match` as separate recovery steps.
+
 PositionId:
 - Do **not** parse logs yourself. Call server endpoint:
   - `GET /positions/by-tx/{receipt.hash}`
-- Use `positions[0].positionId`.
+- Use `data.positions[0].positionId`.
 
 Match call:
 - Wait 5 seconds for Firebase indexing.
@@ -265,4 +268,4 @@ Also mention additional docs available:
 
 ## Final instruction
 
-Now output the complete `SKILL.md` content for ospex-one **version 1.3.3**, following this spec exactly.
+Now output the complete `SKILL.md` content for ospex-one **version 1.3.4**, following this spec exactly.

@@ -8,7 +8,9 @@ These skills allow an OpenClaw agent to place sports bets on-chain via a simple 
 
 ### ospex-one
 
-The production-ready skill. Works end-to-end: pick a team, get a moneyline quote, and place a 3 USDC bet — all from a single message.
+The production-ready skill. Works end-to-end: pick a team, get a moneyline quote, and place a 3 USDC bet — all from a single message. Because ospex-one executes on-chain transactions from minimal input, you may need to tell your agent upfront to use it — something like "Use ospex-one for any team name I send" — so the agent knows to activate the skill when all you type is a team name or city.
+
+![ospex-one demo](./ospex-one-demo.png)
 
 ### ospex-plus
 
@@ -32,3 +34,4 @@ A more full-fledged version of ospex-one that accepts natural speech bets — th
 
 - [ospex.org](https://ospex.org) — Live app
 - [ospex-org](https://github.com/ospex-org) — GitHub org
+- [t.me/ospex](https://t.me/ospex) — Telegram

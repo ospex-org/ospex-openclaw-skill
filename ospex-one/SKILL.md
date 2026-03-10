@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.3.5
+version: 1.4.0
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -49,7 +49,7 @@ When you receive input, your **first action** is always to call the API — do n
 
 1. Call `GET /markets`.
 2. Search all responses for the input text in `homeTeam` and `awayTeam` fields. Note: All API responses use a `{ data: ..., formatted: "..." }` envelope. The `formatted` field is a display convenience — never use it for branching decisions. Always use the `data` object. When searching for teams, look inside the `data` array, not the top-level response.
-3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, and whether the team is home or away. Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note it. If the array is empty or has no entry for the market type, proceed to Step 2 — do not stop, do not ask the user, do not treat this as an error. Step 2's contest-path quote endpoint creates the speculation on the fly.
+3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, and whether the team is home or away. Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note it. If no `speculationId` exists for the detected market type, respond: "No {marketType} market available for {team} right now." and stop.
 4. If the team is not found in any game → respond: "No active market found for {input}"
 
 Only ask the user for clarification if the team is genuinely ambiguous across multiple games.
@@ -70,7 +70,7 @@ If the odds-history endpoint returns no data for the relevant market type, use 1
 
 **Line validation:** The quote API requires lines in .5 increments (e.g., -10.5, +3.5, 195.5). If the line from odds-history is a whole number or does not end in .5, stop and tell the user: "Spread/total line unavailable for this market right now." Do not attempt to convert it.
 
-**If `speculationId` exists** (from the speculations array):
+Request a quote from Michelle using the speculationId from Step 1:
 ```
 POST /instant-match/{speculationId}/quote?stream=false
 {
@@ -82,22 +82,7 @@ POST /instant-match/{speculationId}/quote?stream=false
 }
 ```
 
-**If no speculationId exists** for the market type you need:
-```
-POST /instant-match/quote?stream=false
-{
-  "contestId": {contestId},
-  "marketType": "{detected market type: moneyline, spread, or total}",
-  "side": "home", "away", "over", or "under" (see side mapping below),
-  "amountUSDC": {amount parameter, from Defaults section},
-  "odds": {calculated odds},
-  "oddsFormat": "decimal",
-  "wallet": "{OSPEX_WALLET_ADDRESS}",
-  "line": {line value, required for spread/total, omit for moneyline}
-}
-```
-
-Both return: `quoteId`, `approved`, `approvedOddsDecimal`, `approvedOddsAmerican`, `expiresAt`. If Michelle counters, the response also includes a `counterOffer` object. The quote expires at `expiresAt`. Steps 3-4 must complete before this time.
+This returns: `quoteId`, `approved`, `approvedOddsDecimal`, `approvedOddsAmerican`, `expiresAt`. If Michelle counters, the response also includes a `counterOffer` object. The quote expires at `expiresAt`. Steps 3-4 must complete before this time.
 
 **Save the `txParams` object from the response — you will need it in Step 3.** This contains all pre-computed on-chain transaction parameters. Do not compute these values yourself.
 
@@ -122,10 +107,9 @@ The `txParams` object from Step 2 tells you exactly which contract method to cal
 
 **b) Create the position using `txParams`:**
 
-`txParams.method` is either `"createUnmatchedPair"` or `"createUnmatchedPairWithSpeculation"`. Call the corresponding contract function, passing the values from `txParams.args` directly. Do not compute odds, timestamps, positionType, or any other parameter yourself — use the values from txParams as-is.
+Call `positionModule.createUnmatchedPair()`, passing the values from `txParams.args` directly. Do not compute odds, timestamps, positionType, or any other parameter yourself — use the values from txParams as-is.
 
 ```javascript
-// txParams.method === "createUnmatchedPair"
 const tx = await positionModule.createUnmatchedPair(
   txParams.args.speculationId,
   txParams.args.odds,
@@ -134,20 +118,8 @@ const tx = await positionModule.createUnmatchedPair(
   txParams.args.amount,
   txParams.args.contributionAmount
 );
-
-// OR txParams.method === "createUnmatchedPairWithSpeculation"
-const tx = await positionModule.createUnmatchedPairWithSpeculation(
-  txParams.args.contestId,
-  txParams.args.scorer,
-  txParams.args.theNumber,
-  txParams.args.leaderboardId,
-  txParams.args.odds,
-  txParams.args.unmatchedExpiry,
-  txParams.args.positionType,
-  txParams.args.amount,
-  txParams.args.contributionAmount
-);
 ```
+
 Contributions: `txParams.args.contributionAmount` defaults to "0". Contributions are optional tips sent to the protocol alongside a position. If the user explicitly asks to tip or contribute (e.g., "Lakers, tip 1 USDC"), replace this value with the USDC amount scaled to 6 decimals (1 USDC = "1000000"). Never add a contribution unless the user specifically requests it.
 
 Wait for the transaction to be mined: `const receipt = await tx.wait();`
@@ -283,8 +255,7 @@ Base URL: `https://api.ospex.org/v1` — no auth, rate limit 100 req/60s/IP.
 | `GET /positions/withdraw-result/{txHash}` | Parse withdraw receipt, return amount returned |
 | `GET /analytics/odds-history/{contestId}` | Current market odds + opening lines + line movement |
 | `POST /instant-match/{quoteId}/accept-counter` | Accept Michelle's counter-offer (required before match) |
-| `POST /instant-match/{speculationId}/quote?stream=false` | Request a quote from Michelle (existing speculation) |
-| `POST /instant-match/quote?stream=false` | Request a quote from Michelle (new speculation) |
+| `POST /instant-match/{speculationId}/quote?stream=false` | Request a quote from Michelle |
 | `POST /instant-match/{quoteId}/match` | Match a created position against an approved quote |
 
 ## On-Chain Reference
@@ -304,7 +275,6 @@ For the complete API (including endpoints not used by this skill), see `{baseDir
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function createUnmatchedPair(uint256 speculationId, uint64 odds, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint256 contributionAmount)",
-  "function createUnmatchedPairWithSpeculation(uint256 contestId, address scorer, int32 theNumber, uint256 leaderboardId, uint64 odds, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint256 contributionAmount)",
   "function adjustUnmatchedPair(uint256 speculationId, uint128 oddsPairId, uint32 newUnmatchedExpiry, uint8 positionType, int256 amount, uint256 contributionAmount)",
   "function claimPosition(uint256 speculationId, uint128 oddsPairId, uint8 positionType)",
   "event PositionCreated(uint256 indexed speculationId, address indexed user, uint128 oddsPairId, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint64 upperOdds, uint64 lowerOdds)",

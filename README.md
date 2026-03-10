@@ -16,6 +16,12 @@ The production-ready skill. Works end-to-end: pick a team, get a moneyline quote
 
 A work in progress. Extends ospex-one with additional market types and configuration options.
 
+## Setup
+
+1. **Use a dedicated wallet.** Do not use your primary wallet. Create a new one, fund it with a small amount of USDC on Polygon, and use that for this skill.
+2. **Secure your environment file.** Your private key should be in a file with restricted permissions: `chmod 600` on your `.env` or gateway config file. Never commit it to version control.
+3. **Fund conservatively.** Keep only what you're willing to lose in the wallet — enough for a few bets plus gas. On Polygon, gas costs are negligible (fractions of a cent per transaction).
+
 ## FAQ
 
 **Can I change the default settings?**<br>

@@ -1,6 +1,6 @@
 You are creating an OpenClaw AgentSkill named ospex-one.
 
-**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.2** behavior/spec.
+**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.3** behavior/spec.
 
 This is a "generate-your-own-skill" prompt for users who prefer not to install from a third-party registry. The output SKILL.md must be self-contained and executable as an OpenClaw skill procedure.
 
@@ -10,7 +10,7 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Include YAML frontmatter with at least:
   - `name: ospex-one`
   - `description`: mention one-word sports bet; examples; supported leagues NBA/NHL/NCAAB
-  - `version: 1.3.2`
+  - `version: 1.3.3`
   - `homepage: https://ospex.org`
   - `allowed-tools`: include what’s required to run Node and shell commands
   - `metadata` suitable for ClawHub/OpenClaw that declares:
@@ -195,10 +195,16 @@ If matching fails after retries:
 
 ### Step 4 — Report result
 
-Final output format must be:
+Odds formatting:
+- If `approvedOddsAmerican` is a positive number without a leading `+`, prepend one (e.g., `110` → `+110`). Negative odds already include the `-`.
 
+Match enrichment:
+- The match endpoint may return `matchedAmountUSDC` and `potentialPayoutUSDC`. Use these if present.
+- If absent, use the quoted amount and compute payout as `amount × approvedOddsDecimal`.
+
+Final output format must be:
 ```
-Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {matchedAmountUSDC} USDC matched, potential payout {potentialPayoutUSDC} USDC.
+Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}x), {matchedAmountUSDC} USDC matched, potential payout {potentialPayoutUSDC} USDC.
 https://ospex.org/p/{positionId}
 ```
 
@@ -259,4 +265,4 @@ Also mention additional docs available:
 
 ## Final instruction
 
-Now output the complete `SKILL.md` content for ospex-one **version 1.3.2**, following this spec exactly.
+Now output the complete `SKILL.md` content for ospex-one **version 1.3.3**, following this spec exactly.

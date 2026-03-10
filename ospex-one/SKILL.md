@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.3.2
+version: 1.3.3
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -186,8 +186,12 @@ The protocol indexer can take 5-25 seconds, especially on cold starts. If matchi
 
 ## Step 4: Report Result
 
+**Odds formatting:** If `approvedOddsAmerican` is a positive number without a leading `+`, prepend one (e.g., `110` → `+110`). Negative odds already include the `-`.
+
+If `matchedAmountUSDC` or `potentialPayoutUSDC` is absent from the match response, use the quoted amount and compute payout as `amount × approvedOddsDecimal`.
+
 ```
-Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}), {matchedAmountUSDC} USDC matched, potential payout {potentialPayoutUSDC} USDC.
+Done. {Team} {marketType abbreviation: ML/spread line/total line} at {americanOdds} ({decimalOdds}x), {matchedAmountUSDC} USDC matched, potential payout {potentialPayoutUSDC} USDC.
 https://ospex.org/p/{positionId}
 ```
 

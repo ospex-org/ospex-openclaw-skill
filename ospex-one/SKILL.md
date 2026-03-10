@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.3.4
+version: 1.3.5
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -48,8 +48,8 @@ When you receive input, your **first action** is always to call the API — do n
 **For spread and total markets:** This skill uses the current market line from odds-history. If the user specifies a line that differs from the current market (e.g., user says "+1.5" but market is at -3.5), inform the user of the current line and ask if they want to proceed at that line instead. Do not attempt to create a position at a non-market line.
 
 1. Call `GET /markets`.
-2. Search all responses for the input text in `homeTeam` and `awayTeam` fields. Note: All API responses use a `{ data: ..., formatted: "..." }` envelope. When searching for teams, look inside the `data` array, not the top-level response.
-3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, and whether the team is home or away. Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note it. If the speculations array is empty or has no entry for the market type, that's fine — Step 2 handles this using the contest-path quote endpoint, which creates the speculation on the fly.
+2. Search all responses for the input text in `homeTeam` and `awayTeam` fields. Note: All API responses use a `{ data: ..., formatted: "..." }` envelope. The `formatted` field is a display convenience — never use it for branching decisions. Always use the `data` object. When searching for teams, look inside the `data` array, not the top-level response.
+3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, and whether the team is home or away. Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note it. If the array is empty or has no entry for the market type, proceed to Step 2 — do not stop, do not ask the user, do not treat this as an error. Step 2's contest-path quote endpoint creates the speculation on the fly.
 4. If the team is not found in any game → respond: "No active market found for {input}"
 
 Only ask the user for clarification if the team is genuinely ambiguous across multiple games.

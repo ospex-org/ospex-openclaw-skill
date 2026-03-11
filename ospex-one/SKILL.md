@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.4.0
+version: 1.5.0
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -25,16 +25,16 @@ One word in, one transaction hash out. This skill emphasizes execution over disc
 | Odds multiplier | 1.05 |
 | Odds | market odds × odds multiplier |
 
-## Progress Updates
+## Communication Rules
 
-Throughout Steps 1–3, send the user brief status messages at each stage so they aren't waiting in silence. These should be short, single-line updates — not explanations.
+Do not send progress updates during Steps 1–3. Execute the entire flow silently and only message the user when one of these occurs:
 
-- After Step 1 resolves the team: `"Found: {awayTeam} vs {homeTeam}, {matchTime formatted as 'Mon D, YYYY, H:MM PM' in EST, e.g. 'Mar 3, 2026, 8:00 PM EST'}, {marketType}{line if applicable}"`
-- After Step 2 gets a quote: `"Quote: {approvedOddsAmerican} ({approvedOddsDecimal}), {amount} USDC"`
-- After Step 3 creates the position: `"Position created, waiting for match..."`
-- Step 4 delivers the final result
+- **Ambiguity:** The team name matches multiple games and you need clarification.
+- **Counter-offer:** Michelle offered worse odds and you need the user's approval before proceeding.
+- **Final result:** Step 4 — the position is created and matched (or the match fallback message).
+- **Hard failure:** An API error, on-chain revert, or any condition that stops the flow.
 
-If any step fails, the failure message itself serves as the status update — no need to send a separate one. If any API call returns an unexpected error, stop and report it. Do not silently retry or work around failures.
+If any API call returns an unexpected error, stop and report it. Do not silently retry or work around failures.
 
 ## Step 1: Resolve Team and Market Type
 

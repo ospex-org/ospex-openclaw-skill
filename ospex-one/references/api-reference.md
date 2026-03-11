@@ -160,8 +160,8 @@ curl "https://api.ospex.org/v1/markets?sport=nba&window=48"
       "matchTime": "2026-02-22T00:00:00.000Z",
       "status": "Upcoming",
       "speculations": [
-        { "speculationId": "101", "type": "moneyline", "theNumber": null, "speculationStatus": 0 },
-        { "speculationId": "102", "type": "spread", "theNumber": -3.5, "speculationStatus": 0 }
+        { "speculationId": "101", "type": "moneyline", "theNumber": null, "line": null, "speculationStatus": 0 },
+        { "speculationId": "102", "type": "spread", "theNumber": -4, "awayLine": -3.5, "homeLine": 3.5, "speculationStatus": 0 }
       ]
     }
   ]
@@ -170,6 +170,8 @@ curl "https://api.ospex.org/v1/markets?sport=nba&window=48"
 
 **Notes:**
 - `speculationStatus`: `0` = open, `1` = settled
+- **Spread speculations** use `awayLine` and `homeLine` instead of `line`. `awayLine` is the line from the away team's perspective (e.g. -3.5), `homeLine` is the negation (e.g. 3.5). The `line` field is omitted for spread.
+- **Total speculations** use `line` (e.g. 220.5). **Moneyline** speculations have `line: null`.
 - Returns empty array (not 404) if no markets match
 
 **Errors:** 400 if `sport` is unsupported or `window` is outside 1-168

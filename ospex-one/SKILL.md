@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.5.0
+version: 1.6.0
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -49,7 +49,7 @@ When you receive input, your **first action** is always to call the API — do n
 
 1. Call `GET /markets`.
 2. Search all responses for the input text in `homeTeam` and `awayTeam` fields. Note: All API responses use a `{ data: ..., formatted: "..." }` envelope. The `formatted` field is a display convenience — never use it for branching decisions. Always use the `data` object. When searching for teams, look inside the `data` array, not the top-level response.
-3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, and whether the team is home or away. Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note it. If no `speculationId` exists for the detected market type, respond: "No {marketType} market available for {team} right now." and stop.
+3. If found in exactly one game → that is the team and game. Note `contestId`, `matchTime`, and whether the team is home or away. Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note the `speculationId` and the `line` field — this is the actual on-chain line for the bet. If no `speculationId` exists for the detected market type, respond: "No {marketType} market available for {team} right now." and stop.
 4. If the team is not found in any game → respond: "No active market found for {input}"
 
 Only ask the user for clarification if the team is genuinely ambiguous across multiple games.
@@ -67,6 +67,8 @@ Apply the odds multiplier from the Defaults section and floor to 2 decimal place
 Note: Higher decimal odds = higher payout for the bettor. A quote at 2.00 is better than 1.85.
 
 If the odds-history endpoint returns no data for the relevant market type, use 1.91 as a reasonable default for spread/total (standard -110 line). For moneyline, ask the user — don't guess, since moneyline odds vary widely depending on the matchup.
+
+**Line reporting:** For spread and total markets, always use the `line` from the speculation (noted in Step 1), not the line from odds-history. Odds-history reflects the current external market line, which may have moved since the speculation was created. The speculation's `line` is the actual on-chain line the user is betting on. Use this line in all user-facing messages including the Step 4 result.
 
 **Line validation:** The quote API requires lines in .5 increments (e.g., -10.5, +3.5, 195.5). If the line from odds-history is a whole number or does not end in .5, stop and tell the user: "Spread/total line unavailable for this market right now." Do not attempt to convert it.
 

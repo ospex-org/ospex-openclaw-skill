@@ -88,26 +88,12 @@ Quick reference for spreads: `theNumber` is always from the away team's perspect
 
 Default: `0`. This is an optional contribution to support the protocol. Pass any amount in USDC 6-decimal format (same as the position amount). For example, 1 USDC = `1000000`. The contribution is transferred along with the position amount. Not required.
 
-### leaderboardId (uint256)
-
-Default: `0` (no leaderboard). Leaderboard registration can happen separately after position creation.
-
-### scorer (address)
-
-Determines how the position is settled. Only needed for `createUnmatchedPairWithSpeculation`.
-
-| Market Type | Scorer Address |
-|-------------|---------------|
-| Moneyline | `0x82c93AAf547fC809646A7bEd5D8A9D4B72Db3045` |
-| Spread | `0x4377A09760b3587dAf1717F094bf7bd455daD4af` |
-| Total | `0xD7b35DE1bbFD03625a17F38472d3FBa7b77cBeCf` |
-
 ---
 
 ## Position Lifecycle
 
 ```
-createUnmatchedPair / createUnmatchedPairWithSpeculation
+createUnmatchedPair
   → Position exists with unmatchedAmount > 0
     → adjustUnmatchedPair (add/withdraw funds while speculation is open)
     → completeUnmatchedPair (taker matches some or all of the unmatched amount)
@@ -194,7 +180,7 @@ function completeUnmatchedPair(
 
 ### PositionCreated
 
-Emitted by `createUnmatchedPair` and `createUnmatchedPairWithSpeculation`.
+Emitted by `createUnmatchedPair`.
 
 ```solidity
 event PositionCreated(
@@ -302,7 +288,6 @@ The `payout` field is the total USDC transferred to the user (matched winnings +
 ```json
 [
     "function createUnmatchedPair(uint256 speculationId, uint64 odds, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint256 contributionAmount)",
-    "function createUnmatchedPairWithSpeculation(uint256 contestId, address scorer, int32 theNumber, uint256 leaderboardId, uint64 odds, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint256 contributionAmount)",
     "function adjustUnmatchedPair(uint256 speculationId, uint128 oddsPairId, uint32 newUnmatchedExpiry, uint8 positionType, int256 amount, uint256 contributionAmount)",
     "function claimPosition(uint256 speculationId, uint128 oddsPairId, uint8 positionType)",
     "function completeUnmatchedPair(uint256 speculationId, address maker, uint128 oddsPairId, uint8 makerPositionType, uint256 amount)",

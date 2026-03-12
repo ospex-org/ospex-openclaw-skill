@@ -1176,7 +1176,7 @@ Stream events: `progress` (intermediate updates), `result` (final outcome), `err
 { "approved": false, "reason": "Odds too far from market" }
 ```
 
-**`txParams` object:** Included in approved quotes. Contains pre-computed on-chain transaction parameters — use these directly instead of computing odds conversion, position type, expiry, etc. yourself. The `method` field is either `"createUnmatchedPair"` (speculation path) or `"createUnmatchedPairWithSpeculation"` (contest path). All numeric values are strings (wei-scaled for USDC, 1e7-scaled for odds, unix seconds for expiry).
+**`txParams` object:** Included in approved quotes. Contains pre-computed on-chain transaction parameters — use these directly instead of computing odds conversion, position type, expiry, etc. yourself. The `method` field is `"createUnmatchedPair"`. All numeric values are strings (wei-scaled for USDC, 1e7-scaled for odds, unix seconds for expiry).
 
 #### Sync response (`?stream=false`)
 
@@ -1205,39 +1205,6 @@ curl -X POST "https://api.ospex.org/v1/instant-match/101/quote?stream=false" \
 | `BUSY` | Market maker is evaluating another request |
 | `QUOTE_CREATION_FAILED` | Internal error creating the quote |
 | `EVALUATION_ERROR` | LLM evaluation failed |
-
----
-
-### POST /instant-match/quote
-
-Request a quote without an existing speculation (contest-path variant). Same response format as above (SSE default, `?stream=false` for sync). The market type and contest are specified in the request body. The `txParams` in the response uses `method: "createUnmatchedPairWithSpeculation"` (includes `contestId`, `scorer`, `theNumber`, `leaderboardId` args).
-
-**Request body:**
-
-```json
-{
-  "contestId": 42,
-  "marketType": "moneyline",
-  "side": "away",
-  "amountUSDC": 3.0,
-  "odds": 1.85,
-  "oddsFormat": "decimal",
-  "wallet": "0xYourWalletAddress"
-}
-```
-
-**Additional fields (required for this variant):**
-- `contestId`: on-chain contest ID (number)
-- `marketType`: `"moneyline"`, `"spread"`, or `"total"`
-- `line`: required for spread/total markets; omit for moneyline
-
-**Additional errors:**
-
-| Code | HTTP | Meaning |
-|------|------|---------|
-| `INVALID_REQUEST` | 400 | Missing `contestId` or `marketType` |
-| `INVALID_REQUEST` | 400 | Missing `line` for spread/total markets |
-| `NOT_FOUND` | 404 | Contest not found or missing odds reference data |
 
 ---
 

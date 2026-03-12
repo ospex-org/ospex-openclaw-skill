@@ -1,6 +1,6 @@
 You are creating an OpenClaw AgentSkill named ospex-one.
 
-**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.3.4** behavior/spec.
+**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.6.1** behavior/spec.
 
 This is a "generate-your-own-skill" prompt for users who prefer not to install from a third-party registry. The output SKILL.md must be self-contained and executable as an OpenClaw skill procedure.
 
@@ -10,9 +10,9 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Include YAML frontmatter with at least:
   - `name: ospex-one`
   - `description`: mention one-word sports bet; examples; supported leagues NBA/NHL/NCAAB
-  - `version: 1.3.4`
+  - `version: 1.6.1`
   - `homepage: https://ospex.org`
-  - `allowed-tools`: include what’s required to run Node and shell commands
+  - `allowed-tools`: include what's required to run Node and shell commands
   - `metadata` suitable for ClawHub/OpenClaw that declares:
     - Supported OSes
     - Required binaries: `curl`, `node`
@@ -42,7 +42,7 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 ### Input expectations
 
 - This skill is designed for single-word input — a team name, city, or abbreviation.
-- If the user’s message contains additional modifiers (spread/total language, amount language, etc.), proceed if intent is unambiguous; otherwise ask a single clarification question.
+- If the user's message contains additional modifiers (spread/total language, amount language, etc.), proceed if intent is unambiguous; otherwise ask a single clarification question.
 
 ### Defaults section
 
@@ -54,19 +54,16 @@ Define defaults in a small table:
 - Odds multiplier: 1.05
 - Odds: market odds × multiplier
 
-### Progress Updates
+### Communication Rules
 
-Instruct the agent to send short, single-line progress updates at each stage:
+Instruct the agent to execute the entire flow silently (Steps 1–3) and only message the user when one of these occurs:
 
-- After Step 1 resolves the team:
-  - `Found: {awayTeam} vs {homeTeam}, {matchTime formatted as 'Mon D, YYYY, H:MM PM' in EST, e.g. 'Mar 3, 2026, 8:00 PM EST'}, {marketType}{line if applicable}`
-- After Step 2 gets a quote:
-  - `Quote: {approvedOddsAmerican} ({approvedOddsDecimal}), {amount} USDC`
-- After Step 3 creates the position:
-  - `Position created, waiting for match...`
-- Step 4 delivers the final result.
+- **Ambiguity:** The team name matches multiple games and clarification is needed.
+- **Counter-offer:** Michelle offered worse odds and the user's approval is needed before proceeding.
+- **Final result:** Step 4 — the position is created and matched (or the match fallback message).
+- **Hard failure:** An API error, on-chain revert, or any condition that stops the flow.
 
-If any step fails, the error message is enough (no extra chatter). If any API call returns an unexpected error: stop and report it; do not silently retry/work around failures.
+If any API call returns an unexpected error: stop and report it. Do not silently retry or work around failures.
 
 ### Step 1 — Resolve team and market type
 
@@ -79,15 +76,15 @@ Detect market type from input:
 
 For spread/total:
 - This skill uses the **current market line** from odds-history.
-- If the user-specified line differs from the market’s current line: inform the user of the current line and ask if they want to proceed at the market line. Do not create a position at a non-market line.
+- If the user-specified line differs from the market's current line: inform the user of the current line and ask if they want to proceed at the market line. Do not create a position at a non-market line.
 
 Procedure:
 1. Call `GET /markets`.
 2. Search all responses for the input text in `homeTeam` and `awayTeam`.
-   - Note: API responses use `{ data: ..., formatted: "..." }`. When searching, look inside `data`.
+   - Note: All API responses use a `{ data: ..., formatted: "..." }` envelope. The `formatted` field is a display convenience — never use it for branching decisions. Always use the `data` object. When searching for teams, look inside the `data` array, not the top-level response.
 3. If found in exactly one game: capture `contestId`, `matchTime`, whether the selected team is home/away.
-   - Check the `speculations` array for an existing `speculationId` matching the detected market type; if present, save it.
-   - If missing: ok; Step 2 can quote via the contest-path quote endpoint which creates speculation on-the-fly.
+   - Check the `speculations` array for an existing `speculationId` matching the detected market type. If one exists, note the `speculationId`. For spread speculations, note `awayLine` (away team's perspective, e.g. -3.5) and `homeLine` (home team's perspective, e.g. 3.5) — use whichever matches the user's team. For total speculations, note the `line` field. These are the actual on-chain lines for the bet.
+   - If no `speculationId` exists for the detected market type, respond: "No {marketType} market available for {team} right now." and stop.
 4. If not found: respond exactly `No active market found for {input}`.
 
 Only ask for clarification if the team is genuinely ambiguous across multiple games.
@@ -110,6 +107,9 @@ Notes:
   - spread/total: use **1.91** default
   - moneyline: ask the user what odds they want (do not guess)
 
+Line reporting:
+- For spread markets, use `awayLine` or `homeLine` from the speculation (noted in Step 1) depending on the user's team — not the line from odds-history. For total markets, use `line` from the speculation. Odds-history is for odds values only — ignore its `line` field for spread/total direction. The speculation's line fields are the actual on-chain lines the user is betting on. Use these in all user-facing messages including the Step 4 result.
+
 Line validation:
 - Quote API requires .5 increments for spread/total. If the odds-history line is a whole number or does not end in .5: stop and tell the user:
   - `Spread/total line unavailable for this market right now.`
@@ -117,7 +117,7 @@ Line validation:
 
 Quote request:
 
-If `speculationId` exists:
+Request a quote from Michelle using the speculationId from Step 1:
 ```
 POST /instant-match/{speculationId}/quote?stream=false
 {
@@ -129,22 +129,7 @@ POST /instant-match/{speculationId}/quote?stream=false
 }
 ```
 
-If no `speculationId` exists:
-```
-POST /instant-match/quote?stream=false
-{
-  "contestId": {contestId},
-  "marketType": "moneyline" | "spread" | "total",
-  "side": "home" | "away" | "over" | "under",
-  "amountUSDC": 3,
-  "odds": {calculatedOddsDecimal},
-  "oddsFormat": "decimal",
-  "wallet": "{OSPEX_WALLET_ADDRESS}",
-  "line": {lineValueForSpreadOrTotalOnly}
-}
-```
-
-Both return: `quoteId`, `approved`, `approvedOddsDecimal`, `approvedOddsAmerican`, `expiresAt`, optional `counterOffer`, and **`txParams`**.
+This returns: `quoteId`, `approved`, `approvedOddsDecimal`, `approvedOddsAmerican`, `expiresAt`, optional `counterOffer`, and **`txParams`**.
 
 Rules:
 - **Save `txParams`** — it contains all pre-computed on-chain parameters. Do not compute these values yourself.
@@ -167,13 +152,12 @@ Side mapping:
 Write and execute a **single Node.js script** (ethers.js v6) that does everything in sequence. Do not split into multiple script runs.
 
 Use `txParams` directly:
-- `txParams.method` is `createUnmatchedPair` or `createUnmatchedPairWithSpeculation`.
-- Call the corresponding PositionModule function and pass `txParams.args.*` directly.
+- Call `positionModule.createUnmatchedPair()`, passing the values from `txParams.args` directly.
 - Do not compute odds/timestamps/positionType/etc.
 
 Contributions:
 - `txParams.args.contributionAmount` defaults to `"0"`.
-- Only change it if the user explicitly asks to tip/contribute.
+- Only change it if the user explicitly asks to tip/contribute. Scale to 6 decimals: 1 USDC = "1000000".
 
 After sending the transaction:
 - Wait for confirmation: `const receipt = await tx.wait()`.
@@ -236,10 +220,9 @@ Include base URL:
 - `https://api.ospex.org/v1` (no auth; rate limit 100 req/60s/IP)
 
 List endpoints used:
-- `GET /markets?sport={nba|nhl|ncaab}` (mention sport param usage)
+- `GET /markets?sport={nba|nhl|ncaab}` — find games, contestIds, speculationIds. Spread speculations include `awayLine` and `homeLine` instead of `line`.
 - `GET /analytics/odds-history/{contestId}`
 - `POST /instant-match/{speculationId}/quote?stream=false`
-- `POST /instant-match/quote?stream=false`
 - `POST /instant-match/{quoteId}/accept-counter`
 - `POST /instant-match/{quoteId}/match`
 - `GET /positions/by-tx/{txHash}`
@@ -258,7 +241,7 @@ Include:
   - PositionModule: `0xF717aa8fe4BEDcA345B027D065DA0E1a31465B1A`
 - Minimal ABI (ethers.js v6 human-readable) including:
   - `approve`, `allowance`
-  - `createUnmatchedPair`, `createUnmatchedPairWithSpeculation`
+  - `createUnmatchedPair`
   - `adjustUnmatchedPair`, `claimPosition`
   - PositionCreated/PositionClaimed events
 
@@ -268,4 +251,4 @@ Also mention additional docs available:
 
 ## Final instruction
 
-Now output the complete `SKILL.md` content for ospex-one **version 1.3.4**, following this spec exactly.
+Now output the complete `SKILL.md` content for ospex-one **version 1.6.1**, following this spec exactly.

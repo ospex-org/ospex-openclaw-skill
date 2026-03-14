@@ -1,6 +1,6 @@
 You are creating an OpenClaw AgentSkill named ospex-one.
 
-**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.6.1** behavior/spec.
+**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.7.0** behavior/spec.
 
 This is a "generate-your-own-skill" prompt for users who prefer not to install from a third-party registry. The output SKILL.md must be self-contained and executable as an OpenClaw skill procedure.
 
@@ -10,7 +10,7 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Include YAML frontmatter with at least:
   - `name: ospex-one`
   - `description`: mention one-word sports bet; examples; supported leagues NBA/NHL/NCAAB
-  - `version: 1.6.1`
+  - `version: 1.7.0`
   - `homepage: https://ospex.org`
   - `allowed-tools`: include what's required to run Node and shell commands
   - `metadata` suitable for ClawHub/OpenClaw that declares:
@@ -38,6 +38,7 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Mention unmatched funds can be withdrawn at any time.
 - Link to the canonical risks doc:
   - https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
+- State that this skill should only be used with a dedicated low-fund wallet — do not configure it with a wallet containing more funds than you are willing to lose.
 
 ### Input expectations
 
@@ -155,6 +156,13 @@ Use `txParams` directly:
 - Call `positionModule.createUnmatchedPair()`, passing the values from `txParams.args` directly.
 - Do not compute odds/timestamps/positionType/etc.
 
+Transaction safety (mandatory):
+- Before signing any transaction, the script must verify that the contract address used equals the PositionModule address from the On-Chain Reference section. Never derive a contract address from the API response.
+- Verify `txParams.method` matches the expected function for the operation (`createUnmatchedPair` for position creation, `adjustUnmatchedPair` for withdrawal, `claimPosition` for claiming).
+- If either check fails, STOP and report the mismatch to the user. Do not sign or broadcast.
+- Include a code example showing the method verification check.
+- This applies to all on-chain operations: position creation, withdrawal, and claiming.
+
 Contributions:
 - `txParams.args.contributionAmount` defaults to `"0"`.
 - Only change it if the user explicitly asks to tip/contribute. Scale to 6 decimals: 1 USDC = "1000000".
@@ -206,12 +214,12 @@ Include:
 
 - Withdraw unmatched position:
   - `GET /positions/{OSPEX_WALLET_ADDRESS}/withdraw-params`
-  - Use returned `txParams` and call `positionModule.adjustUnmatchedPair()` with args directly.
+  - Use returned `txParams` and call `positionModule.adjustUnmatchedPair()` with args directly. Verify `txParams.method` equals `adjustUnmatchedPair` before signing.
   - Then call `GET /positions/withdraw-result/{txHash}` and report amount returned.
 
 - Claim resolved position:
   - `GET /positions/{OSPEX_WALLET_ADDRESS}/claim-params`
-  - For each entry, call `positionModule.claimPosition()` with args directly.
+  - For each entry, call `positionModule.claimPosition()` with args directly. Verify `txParams.method` equals `claimPosition` before signing.
   - Then call `GET /positions/claim-result/{txHash}` and report payout.
 
 ### API reference section
@@ -251,4 +259,4 @@ Also mention additional docs available:
 
 ## Final instruction
 
-Now output the complete `SKILL.md` content for ospex-one **version 1.6.1**, following this spec exactly.
+Now output the complete `SKILL.md` content for ospex-one **version 1.7.0**, following this spec exactly.

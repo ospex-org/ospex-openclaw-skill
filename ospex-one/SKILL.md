@@ -1,7 +1,7 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.6.1
+version: 1.7.0
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
@@ -11,7 +11,7 @@ metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"require
 
 One word in, one transaction hash out. This skill emphasizes execution over discussion and is low-risk by design.
 
-**Trust statement:** This skill executes real transactions on Polygon mainnet using your configured wallet. Positions are capped at 3 USDC. Unmatched position amounts can be withdrawn at any time. Only install if you understand the risks. Full risk assessment: https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
+**Trust statement:** This skill executes real transactions on Polygon mainnet using your configured wallet. Positions are capped at 3 USDC. Unmatched position amounts can be withdrawn at any time. Only use this skill with a dedicated low-fund wallet — do not configure it with a wallet containing more funds than you are willing to lose. Full risk assessment: https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
 
 **Input expectations:** This skill is designed for single-word input — a team name, city, or abbreviation. If the user's message contains additional instructions, modifiers, or betting language beyond a team name (e.g., "lay the points", "take the under", "bet $5", "Celtics -6.5"), act on it if the intent is unambiguous — otherwise, ask the user to clarify before proceeding.
 
@@ -105,6 +105,21 @@ Write and execute a **single Node.js script** (ethers.js v6) that does everythin
 
 The `txParams` object from Step 2 tells you exactly which contract method to call and with what arguments. Use it directly.
 
+**Transaction safety (mandatory):** Before signing any transaction, verify:
+1. The contract address used in the script equals the PositionModule address from the On-Chain Reference section (`0xF717aa8fe4BEDcA345B027D065DA0E1a31465B1A`). Never derive a contract address from the API response.
+2. `txParams.method` equals the expected function for the operation (`createUnmatchedPair` for position creation, `adjustUnmatchedPair` for withdrawal, `claimPosition` for claiming).
+
+If either check fails, STOP and report the mismatch to the user. Do not sign or broadcast.
+
+```javascript
+// Verify before signing
+if (txParams.method !== "createUnmatchedPair") {
+  throw new Error(`Unexpected txParams.method: ${txParams.method}`);
+}
+```
+
+This check applies to all on-chain operations in this skill, including withdraw and claim in Step 5.
+
 **a) Check USDC allowance** — if insufficient, approve and wait for confirmation.
 
 **b) Create the position using `txParams`:**
@@ -192,7 +207,7 @@ If the position was not matched (or was only partially matched), the user can wi
 
 1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/withdraw-params`
 2. The response contains a `positions` array. Each entry includes a `description` (e.g., "Lakers ML — Unmatched, 3.00 USDC") and a `txParams` object.
-3. Write and execute a Node.js script (ethers.js v6) that calls `positionModule.adjustUnmatchedPair()` using the values from `txParams.args` directly. Do not compute any arguments yourself. Wait for the transaction to be mined.
+3. Write and execute a Node.js script (ethers.js v6) that calls `positionModule.adjustUnmatchedPair()` using the values from `txParams.args` directly. Do not compute any arguments yourself. Verify `txParams.method` equals `adjustUnmatchedPair` before signing (see Step 3 transaction safety). Wait for the transaction to be mined.
 
 ```javascript
 const tx = await positionModule.adjustUnmatchedPair(
@@ -218,7 +233,7 @@ After the game ends and the speculation is settled (scored), the user can claim 
 
 1. Call `GET /positions/{OSPEX_WALLET_ADDRESS}/claim-params`
 2. The response contains a `positions` array. Each entry includes a `description` (e.g., "Celtics ML — Won") and a `txParams` object.
-3. Write and execute a single Node.js script (ethers.js v6) that calls `positionModule.claimPosition()` for each position, using the values from each entry's `txParams.args` directly. Do not compute any arguments yourself. Wait for each transaction to be mined.
+3. Write and execute a single Node.js script (ethers.js v6) that calls `positionModule.claimPosition()` for each position, using the values from each entry's `txParams.args` directly. Do not compute any arguments yourself. Verify `txParams.method` equals `claimPosition` before signing (see Step 3 transaction safety). Wait for each transaction to be mined.
 
 ```javascript
 for (const entry of positions) {

@@ -1,6 +1,6 @@
 You are creating an OpenClaw AgentSkill named ospex-one.
 
-**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.7.0** behavior/spec.
+**Goal:** produce a single SKILL.md file that exactly matches ospex-one **version 1.7.1** behavior/spec.
 
 This is a "generate-your-own-skill" prompt for users who prefer not to install from a third-party registry. The output SKILL.md must be self-contained and executable as an OpenClaw skill procedure.
 
@@ -10,15 +10,17 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 - Include YAML frontmatter with at least:
   - `name: ospex-one`
   - `description`: mention one-word sports bet; examples; supported leagues NBA/NHL/NCAAB
-  - `version: 1.7.0`
+  - `version: 1.7.1`
   - `homepage: https://ospex.org`
   - `allowed-tools`: include what's required to run Node and shell commands
+  - `compatibility`: a short sentence covering runtime requirements (Node, ethers.js v6), required env vars with sensitivity notes for `OSPEX_WALLET_PRIVATE_KEY`, and a reminder to use a dedicated low-fund wallet
   - `metadata` suitable for ClawHub/OpenClaw that declares:
     - Supported OSes
     - Required binaries: `curl`, `node`
     - Required env vars: `OSPEX_WALLET_PRIVATE_KEY`, `OSPEX_WALLET_ADDRESS`, `OSPEX_RPC_URL`
     - Optional install hint for ethers (npm)
 - The body must be a complete, agent-executable procedure with clear steps and exact API calls / behaviors.
+- Include an **Invocation** paragraph stating the skill is **invocation-only**: the agent will not use it unless the user explicitly asks or references a team name in context. This avoids accidental bets.
 
 ## Hard constraints (do not deviate)
 
@@ -31,14 +33,16 @@ This is a "generate-your-own-skill" prompt for users who prefer not to install f
 
 ## Required SKILL.md content (spec)
 
-### Trust + risk
+### Trust & safety
 
-- Include a blunt "Trust statement" that this skill executes real transactions on Polygon mainnet using the configured wallet.
-- Cap position size at **3 USDC** per transaction by default.
-- Mention unmatched funds can be withdrawn at any time.
-- Link to the canonical risks doc:
-  - https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
-- State that this skill should only be used with a dedicated low-fund wallet — do not configure it with a wallet containing more funds than you are willing to lose.
+- Include a **Trust & safety** paragraph that:
+  - States this skill executes real transactions on Polygon mainnet using the configured wallet.
+  - Cap position size at **3 USDC** per transaction by default.
+  - Mentions unmatched funds can be withdrawn at any time.
+  - States the agent verifies all transaction parameters against hardcoded contract addresses and expected method names before signing — if anything is unexpected, it halts and reports rather than proceeding.
+  - States OSPEX_WALLET_PRIVATE_KEY is high-sensitivity: the agent must never log, echo, or expose it.
+  - States this skill should only be used with a dedicated low-fund wallet — do not configure it with a wallet containing more funds than you are willing to lose.
+  - Links to the canonical risks doc: https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
 
 ### Input expectations
 
@@ -156,12 +160,16 @@ Use `txParams` directly:
 - Call `positionModule.createUnmatchedPair()`, passing the values from `txParams.args` directly.
 - Do not compute odds/timestamps/positionType/etc.
 
-Transaction safety (mandatory):
-- Before signing any transaction, the script must verify that the contract address used equals the PositionModule address from the On-Chain Reference section. Never derive a contract address from the API response.
-- Verify `txParams.method` matches the expected function for the operation (`createUnmatchedPair` for position creation, `adjustUnmatchedPair` for withdrawal, `claimPosition` for claiming).
-- If either check fails, STOP and report the mismatch to the user. Do not sign or broadcast.
+Transaction safety (mandatory — 4 checks):
+- Before signing any transaction, the agent must verify all of the following. If any check fails, STOP — do not sign or broadcast. Report the mismatch to the user.
+  1. **Contract address:** The contract address used in the script equals the PositionModule address from the On-Chain Reference section. Never derive a contract address from the API response.
+  2. **Method name:** `txParams.method` must equal the expected function for the operation (`createUnmatchedPair` for position creation, `adjustUnmatchedPair` for withdrawal, `claimPosition` for claiming).
+  3. **Amount:** The USDC amount must not exceed the 3 USDC cap defined in Defaults (plus any user-requested contribution).
+  4. **Private key handling:** OSPEX_WALLET_PRIVATE_KEY must only be used inside ethers.js `Wallet` construction. Never log, echo, interpolate into URLs, or pass to any external service.
 - Include a code example showing the method verification check.
 - This applies to all on-chain operations: position creation, withdrawal, and claiming.
+
+Before creating the position, check USDC allowance for the PositionModule. If insufficient, approve and wait for confirmation before proceeding.
 
 Contributions:
 - `txParams.args.contributionAmount` defaults to `"0"`.
@@ -259,4 +267,4 @@ Also mention additional docs available:
 
 ## Final instruction
 
-Now output the complete `SKILL.md` content for ospex-one **version 1.7.0**, following this spec exactly.
+Now output the complete `SKILL.md` content for ospex-one **version 1.7.1**, following this spec exactly.

@@ -1,9 +1,10 @@
 ---
 name: ospex-one
 description: "Bet on sports with one word (or maybe, a few words). Say a team name, city, or abbreviation. 'Edmonton', 'Duke', 'Celtics', 'Lakers'. NBA, NHL, NCAAB."
-version: 1.7.0
+version: 1.7.1
 homepage: "https://ospex.org"
 allowed-tools: ["bash", "exec"]
+compatibility: "Requires Node and ethers.js v6. Required env: OSPEX_WALLET_PRIVATE_KEY (wallet private key; high-sensitivity — do not log or expose), OSPEX_WALLET_ADDRESS, OSPEX_RPC_URL (Polygon RPC). Use a dedicated low-fund betting wallet; do not use your primary wallet."
 metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"requires":{"bins":["curl","node"],"env":["OSPEX_WALLET_PRIVATE_KEY","OSPEX_WALLET_ADDRESS","OSPEX_RPC_URL"]},"primaryEnv":"OSPEX_WALLET_PRIVATE_KEY","install":[{"id":"ethers","kind":"node","package":"ethers","bins":[],"label":"Install ethers.js (npm)"}]}}
 ---
 
@@ -11,7 +12,9 @@ metadata: {"clawdbot":{"emoji":"⚖️","os":["darwin","linux","win32"],"require
 
 One word in, one transaction hash out. This skill emphasizes execution over discussion and is low-risk by design.
 
-**Trust statement:** This skill executes real transactions on Polygon mainnet using your configured wallet. Positions are capped at 3 USDC. Unmatched position amounts can be withdrawn at any time. Only use this skill with a dedicated low-fund wallet — do not configure it with a wallet containing more funds than you are willing to lose. Full risk assessment: https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
+**Invocation:** This skill is **invocation-only**: the agent will not use it unless you explicitly ask or reference a team name in context. That avoids accidental bets.
+
+**Trust & safety:** This skill executes real transactions on Polygon mainnet using your configured wallet. Positions are capped at 3 USDC. Unmatched position amounts can be withdrawn at any time. The agent verifies all transaction parameters against hardcoded contract addresses and expected method names before signing — if anything is unexpected, it halts and reports rather than proceeding. OSPEX_WALLET_PRIVATE_KEY is high-sensitivity: the agent must never log, echo, or expose it. Only use this skill with a dedicated low-fund wallet — do not configure it with a wallet containing more funds than you are willing to lose. Full risk assessment: https://github.com/ospex-org/ospex-contracts-v2/blob/main/docs/RISKS.md
 
 **Input expectations:** This skill is designed for single-word input — a team name, city, or abbreviation. If the user's message contains additional instructions, modifiers, or betting language beyond a team name (e.g., "lay the points", "take the under", "bet $5", "Celtics -6.5"), act on it if the intent is unambiguous — otherwise, ask the user to clarify before proceeding.
 
@@ -105,11 +108,11 @@ Write and execute a **single Node.js script** (ethers.js v6) that does everythin
 
 The `txParams` object from Step 2 tells you exactly which contract method to call and with what arguments. Use it directly.
 
-**Transaction safety (mandatory):** Before signing any transaction, verify:
-1. The contract address used in the script equals the PositionModule address from the On-Chain Reference section (`0xF717aa8fe4BEDcA345B027D065DA0E1a31465B1A`). Never derive a contract address from the API response.
-2. `txParams.method` equals the expected function for the operation (`createUnmatchedPair` for position creation, `adjustUnmatchedPair` for withdrawal, `claimPosition` for claiming).
-
-If either check fails, STOP and report the mismatch to the user. Do not sign or broadcast.
+**Transaction safety (mandatory):** Before signing any transaction, the agent must verify all of the following. If any check fails, STOP — do not sign or broadcast. Report the mismatch to the user.
+1. **Contract address:** The contract address used in the script equals the PositionModule address from the On-Chain Reference section (`0xF717aa8fe4BEDcA345B027D065DA0E1a31465B1A`). Never derive a contract address from the API response.
+2. **Method name:** `txParams.method` must equal the expected function for the operation (`createUnmatchedPair` for position creation, `adjustUnmatchedPair` for withdrawal, `claimPosition` for claiming).
+3. **Amount:** The USDC amount must not exceed the 3 USDC cap defined in Defaults (plus any user-requested contribution).
+4. **Private key handling:** OSPEX_WALLET_PRIVATE_KEY must only be used inside ethers.js `Wallet` construction. Never log, echo, interpolate into URLs, or pass to any external service.
 
 ```javascript
 // Verify before signing

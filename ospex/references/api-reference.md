@@ -266,6 +266,119 @@ curl "https://api.ospex.org/v1/odds?sport=nba"
 
 ---
 
+### GET /schedule
+
+Full day's game schedule from ESPN with Ospex on-chain market availability overlaid. Shows all games for a sport, with `ospexContestId` and `ospexMarkets` populated when an on-chain market exists.
+
+| Name | Type | Required | Constraints |
+|------|------|----------|-------------|
+| `sport` | string | **yes** | `nba`, `nhl`, `ncaab` |
+
+```bash
+curl "https://api.ospex.org/v1/schedule?sport=nba"
+```
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "gameId": "401820740",
+      "sport": "nba",
+      "gameDate": "2026-03-21T00:00:00.000Z",
+      "status": "scheduled",
+      "statusDetail": null,
+      "homeTeam": { "name": "Los Angeles Lakers", "abbreviation": "LAL" },
+      "awayTeam": { "name": "Boston Celtics", "abbreviation": "BOS" },
+      "homeScore": null,
+      "awayScore": null,
+      "broadcast": "ESPN",
+      "venue": "Crypto.com Arena",
+      "ospexContestId": "42",
+      "ospexMarkets": [
+        { "type": "moneyline", "line": null },
+        { "type": "spread", "line": -3.5 },
+        { "type": "total", "line": 220.5 }
+      ]
+    }
+  ]
+}
+```
+
+**Fields:**
+- `ospexContestId`: on-chain contest ID, or `null` if no Ospex market for this game
+- `ospexMarkets`: array of available market types with lines, or `null` if no Ospex market
+- `status`: `"scheduled"`, `"in_progress"`, or `"final"`
+
+**Errors:** 400 if `sport` is missing or invalid
+
+---
+
+## Current Odds
+
+Live consensus sportsbook odds from JSONOdds. These are **external reference prices** — not Ospex on-chain liquidity (use `GET /odds` for that).
+
+### GET /current-odds
+
+Search for live consensus odds by team name and/or sport.
+
+| Name | Type | Required | Constraints |
+|------|------|----------|-------------|
+| `team` | string | at least one of `team` or `sport` | Team name to search |
+| `sport` | string | at least one of `team` or `sport` | `nba`, `nhl`, `ncaab`, `nfl`, `mlb` |
+
+```bash
+curl "https://api.ospex.org/v1/current-odds?team=Lakers&sport=nba"
+```
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "contestId": 42,
+      "jsonoddsId": "abc-123",
+      "homeTeam": "Los Angeles Lakers",
+      "awayTeam": "Boston Celtics",
+      "sport": "nba",
+      "matchTime": "2026-03-21T00:00:00.000Z",
+      "odds": {
+        "moneyline": { "home": -150, "away": 130 },
+        "spread": { "line": -3.5, "home": -110, "away": -110 },
+        "total": { "line": 220.5, "over": -110, "under": -110 }
+      },
+      "source": "jsonodds",
+      "updatedAt": "2026-03-21T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Fields:**
+- `contestId`: on-chain contest ID if an Ospex market exists, `null` otherwise
+- `odds`: all odds in **American format**
+- `source`: always `"jsonodds"`
+
+**Errors:** 400 if neither `team` nor `sport` provided, or `sport` is invalid; 404 if no games found
+
+---
+
+### GET /current-odds/:contestId
+
+Live consensus odds for a specific on-chain contest.
+
+```bash
+curl "https://api.ospex.org/v1/current-odds/42"
+```
+
+**Response:** Same shape as `GET /current-odds` but returns a single object (not array).
+
+**Errors:** 400 if `contestId` is not a valid number; 404 if contest not found or no live odds available
+
+---
+
 ## Positions
 
 ### GET /positions/:address
@@ -644,10 +757,10 @@ Comprehensive matchup analysis. Primary: ELO-based win probability. Supplementar
 
 | Name | Type | Default | Constraints |
 |------|------|---------|-------------|
-| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab` |
+| `sport` | string | _(auto-detected from contest)_ | `nba`, `nhl`, `ncaab`. Optional override — sport is resolved from the contest's on-chain data when omitted. |
 
 ```bash
-curl "https://api.ospex.org/v1/analytics/matchup/87?sport=ncaab"
+curl "https://api.ospex.org/v1/analytics/matchup/87"
 ```
 
 **Response:**
@@ -1100,6 +1213,8 @@ The instant match system connects users with Michelle (the automated market make
 
 Request a quote for an existing on-chain speculation. Default response is Server-Sent Events (SSE). Add `?stream=false` for a single JSON response.
 
+**Alternative path:** `POST /instant-match/quote` (without `:speculationId`). Pass `contestId`, `marketType`, and `line` in the request body instead. The server resolves the speculation automatically. When using this path, `txParams.method` will be `"createUnmatchedPairWithSpeculation"` instead of `"createUnmatchedPair"` (see below).
+
 **Request body:**
 
 ```json
@@ -1118,6 +1233,11 @@ Request a quote for an existing on-chain speculation. Default response is Server
 - `odds`: requested odds in the format specified by `oddsFormat`
 - `oddsFormat`: `"decimal"` (default), `"american"`, or `"probability"`
 - `wallet`: your wallet address (0x-prefixed)
+
+**Additional fields for `POST /instant-match/quote` (contestId path only):**
+- `contestId`: on-chain contest ID (required)
+- `marketType`: `"moneyline"`, `"spread"`, or `"total"` (required)
+- `line`: the line number (required for spread/total, omit or `0` for moneyline)
 
 #### SSE response (default)
 
@@ -1176,7 +1296,28 @@ Stream events: `progress` (intermediate updates), `result` (final outcome), `err
 { "approved": false, "reason": "Odds too far from market" }
 ```
 
-**`txParams` object:** Included in approved quotes. Contains pre-computed on-chain transaction parameters — use these directly instead of computing odds conversion, position type, expiry, etc. yourself. The `method` field is `"createUnmatchedPair"`. All numeric values are strings (wei-scaled for USDC, 1e7-scaled for odds, unix seconds for expiry).
+**`txParams` object:** Included in approved quotes. Contains pre-computed on-chain transaction parameters — use these directly instead of computing odds conversion, position type, expiry, etc. yourself. All numeric values are strings (wei-scaled for USDC, 1e7-scaled for odds, unix seconds for expiry).
+
+When using the **speculationId path**, `txParams.method` is `"createUnmatchedPair"` (as shown above).
+
+When using the **contestId path** (`POST /instant-match/quote`), `txParams.method` is `"createUnmatchedPairWithSpeculation"` and includes additional args:
+
+```json
+{
+  "method": "createUnmatchedPairWithSpeculation",
+  "args": {
+    "contestId": "42",
+    "scorer": "0x82c93AAf547fC809646A7bEd5D8A9D4B72Db3045",
+    "theNumber": "0",
+    "leaderboardId": "7",
+    "odds": "18500000",
+    "unmatchedExpiry": "1709596800",
+    "positionType": 0,
+    "amount": "3000000",
+    "contributionAmount": "0"
+  }
+}
+```
 
 #### Sync response (`?stream=false`)
 

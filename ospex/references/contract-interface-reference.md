@@ -101,6 +101,38 @@ createUnmatchedPair
     → claimPosition (collects matched winnings + any unmatched remainder)
 ```
 
+### createUnmatchedPairWithSpeculation
+
+Creates a new position AND a new speculation in a single transaction. Used when the contest exists on-chain but no speculation of the desired type (moneyline/spread/total) has been created yet. The contestId quote path (`POST /instant-match/quote`) returns `txParams` with this method when the speculation doesn't exist.
+
+```solidity
+function createUnmatchedPairWithSpeculation(
+    uint256 contestId,
+    address scorer,              // scorer contract for the market type
+    int32   theNumber,           // 0 for moneyline; see theNumber-conversion.md for spread/total
+    uint256 leaderboardId,       // active leaderboard ID
+    uint64  odds,                // 1e7 precision
+    uint32  unmatchedExpiry,     // unix timestamp
+    uint8   positionType,        // 0=Upper, 1=Lower
+    uint256 amount,              // USDC in 6 decimals
+    uint256 contributionAmount   // 0 (optional protocol contribution)
+) external
+```
+
+**Scorer addresses by market type:**
+
+| Market Type | Scorer Address |
+|-------------|---------------|
+| Moneyline | `0x82c93AAf547fC809646A7bEd5D8A9D4B72Db3045` |
+| Spread | `0x4377A09760b3587dAf1717F094bf7bd455daD4af` |
+| Total | `0xD7b35DE1bbFD03625a17F38472d3FBa7b77cBeCf` |
+
+**Preconditions:**
+- Contest must exist on-chain
+- Same odds/amount/expiry constraints as `createUnmatchedPair`
+
+---
+
 ### adjustUnmatchedPair
 
 Adds to or withdraws from the unmatched portion of a position. Can also update the expiry.
@@ -288,6 +320,7 @@ The `payout` field is the total USDC transferred to the user (matched winnings +
 ```json
 [
     "function createUnmatchedPair(uint256 speculationId, uint64 odds, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint256 contributionAmount)",
+    "function createUnmatchedPairWithSpeculation(uint256 contestId, address scorer, int32 theNumber, uint256 leaderboardId, uint64 odds, uint32 unmatchedExpiry, uint8 positionType, uint256 amount, uint256 contributionAmount)",
     "function adjustUnmatchedPair(uint256 speculationId, uint128 oddsPairId, uint32 newUnmatchedExpiry, uint8 positionType, int256 amount, uint256 contributionAmount)",
     "function claimPosition(uint256 speculationId, uint128 oddsPairId, uint8 positionType)",
     "function completeUnmatchedPair(uint256 speculationId, address maker, uint128 oddsPairId, uint8 makerPositionType, uint256 amount)",

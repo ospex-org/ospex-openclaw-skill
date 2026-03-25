@@ -272,7 +272,7 @@ Full day's game schedule from ESPN with Ospex on-chain market availability overl
 
 | Name | Type | Required | Constraints |
 |------|------|----------|-------------|
-| `sport` | string | **yes** | `nba`, `nhl`, `ncaab` |
+| `sport` | string | **yes** | `nba`, `nhl`, `ncaab`, `mlb` |
 
 ```bash
 curl "https://api.ospex.org/v1/schedule?sport=nba"
@@ -757,7 +757,7 @@ Comprehensive matchup analysis. Primary: ELO-based win probability. Supplementar
 
 | Name | Type | Default | Constraints |
 |------|------|---------|-------------|
-| `sport` | string | _(auto-detected from contest)_ | `nba`, `nhl`, `ncaab`. Optional override — sport is resolved from the contest's on-chain data when omitted. |
+| `sport` | string | _(auto-detected from contest)_ | `nba`, `nhl`, `ncaab`, `mlb`. Optional override — sport is resolved from the contest's on-chain data when omitted. |
 
 ```bash
 curl "https://api.ospex.org/v1/analytics/matchup/87"
@@ -783,8 +783,8 @@ curl "https://api.ospex.org/v1/analytics/matchup/87"
 
 **Supplementary sections:**
 - `schedule`: rest days, back-to-back status, recent form. All sports.
-- `standings`: record, conference rank, streaks. NBA/NHL only.
-- `injuries`: current injury report. NBA/NHL only.
+- `standings`: record, conference rank, streaks. NBA, NHL, and MLB.
+- `injuries`: current injury report. NBA, NHL, and MLB.
 - `rankings`: AP/Coaches poll rank. NCAAB only.
 - `expertPicks`: pundit picks if available.
 - Sections are silently omitted if data is unavailable — never errors.
@@ -799,7 +799,7 @@ Recent and upcoming games, rest days, and back-to-back status.
 
 | Name | Type | Required | Constraints |
 |------|------|----------|-------------|
-| `sport` | string | **yes** | `nba`, `nhl`, `ncaab` |
+| `sport` | string | **yes** | `nba`, `nhl`, `ncaab`, `mlb` |
 
 ```bash
 curl "https://api.ospex.org/v1/analytics/schedule/duke-blue-devils?sport=ncaab"
@@ -831,11 +831,11 @@ curl "https://api.ospex.org/v1/analytics/schedule/duke-blue-devils?sport=ncaab"
 
 ### GET /analytics/injuries/:teamName
 
-Current injury report. Empty array means the team is healthy. NBA and NHL only.
+Current injury report. Empty array means the team is healthy. NBA, NHL, and MLB.
 
 | Name | Type | Required | Constraints |
 |------|------|----------|-------------|
-| `sport` | string | **yes** | `nba`, `nhl` |
+| `sport` | string | **yes** | `nba`, `nhl`, `mlb` |
 
 ```bash
 curl "https://api.ospex.org/v1/analytics/injuries/los-angeles-lakers?sport=nba"
@@ -860,11 +860,11 @@ curl "https://api.ospex.org/v1/analytics/injuries/los-angeles-lakers?sport=nba"
 
 ### GET /analytics/team-stats/:teamName
 
-Team statistics — point differential, PPG, shooting percentages, special teams. NBA and NHL only.
+Team statistics — point differential, PPG, shooting percentages, special teams. NBA, NHL, and MLB.
 
 | Name | Type | Required | Constraints |
 |------|------|----------|-------------|
-| `sport` | string | **yes** | `nba`, `nhl` |
+| `sport` | string | **yes** | `nba`, `nhl`, `mlb` |
 
 ```bash
 curl "https://api.ospex.org/v1/analytics/team-stats/los-angeles-lakers?sport=nba"
@@ -895,16 +895,17 @@ curl "https://api.ospex.org/v1/analytics/team-stats/los-angeles-lakers?sport=nba
 **Sport-specific fields:**
 - **NBA:** `fieldGoalPct`, `threePointPct` (display-ready percentages, e.g., 50.0 = 50.0%)
 - **NHL:** `pace` (shots/game), `powerPlayPct`, `penaltyKillPct`, `savePct`
+- **MLB:** `fieldGoalPct` = batting average, `threePointPct` = OPS, `pace` = ERA, `savePct` = WHIP, `pointsPerGame` = runs/game, `pointsAllowedPerGame` = runs allowed/game
 
 ---
 
 ### GET /analytics/standings
 
-Full league standings. NBA and NHL only (use `/analytics/rankings` for NCAAB).
+Full league standings. NBA, NHL, and MLB (use `/analytics/rankings` for NCAAB).
 
 | Name | Type | Required | Constraints |
 |------|------|----------|-------------|
-| `league` | string | **yes** | `nba`, `nhl` |
+| `league` | string | **yes** | `nba`, `nhl`, `mlb` |
 | `conference` | string | no | Filter by conference (e.g., `Eastern`, `Western`) |
 
 ```bash
@@ -981,11 +982,11 @@ curl "https://api.ospex.org/v1/analytics/rankings?poll=ap"
 
 ### GET /analytics/rosters/:teamName
 
-Current team roster. NBA and NHL only.
+Current team roster. NBA, NHL, and MLB.
 
 | Name | Type | Required | Constraints |
 |------|------|----------|-------------|
-| `sport` | string | **yes** | `nba`, `nhl` |
+| `sport` | string | **yes** | `nba`, `nhl`, `mlb` |
 
 ```bash
 curl "https://api.ospex.org/v1/analytics/rosters/los-angeles-lakers?sport=nba"
@@ -1045,7 +1046,7 @@ ELO rating for a single team.
 
 | Name | Type | Default | Constraints |
 |------|------|---------|-------------|
-| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab` |
+| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab`, `mlb` |
 | `season` | number | _(current)_ | Range 2000-2100 |
 
 ```bash
@@ -1088,7 +1089,7 @@ Top ELO rankings for a sport.
 
 | Name | Type | Default | Constraints |
 |------|------|---------|-------------|
-| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab` |
+| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab`, `mlb` |
 | `season` | number | _(current)_ | Range 2000-2100 |
 | `top` | number | _(all)_ | Range 1-500 |
 
@@ -1106,7 +1107,7 @@ All ELO ratings for a sport (no top limit).
 
 | Name | Type | Default | Constraints |
 |------|------|---------|-------------|
-| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab` |
+| `sport` | string | `ncaab` | `nba`, `nhl`, `ncaab`, `mlb` |
 | `season` | number | _(current)_ | Range 2000-2100 |
 
 **Response:** Same array format as `/analytics/elo/rankings`.
@@ -1135,7 +1136,7 @@ curl "https://api.ospex.org/v1/protocol/info"
       "core": "0x8016b2C5f161e84940E25Bb99479aAca19D982aD",
       "usdc": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
     },
-    "supportedSports": ["NBA", "NHL", "NCAAB"],
+    "supportedSports": ["NBA", "NHL", "NCAAB", "MLB"],
     "fees": {
       "platformFeePct": 0,
       "description": "No platform fees. 100% of stakes go to winners."
